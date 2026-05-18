@@ -3,24 +3,22 @@
 (require rackunit
          "cnf.rkt")
 
-;; Reset before each group to keep tests independent.
-
-;; 1. Objects get unique opaque IDs
+;; 1. Entities get unique opaque IDs
 (reset-store!)
-(let ([a (object!)]
-      [b (object!)]
-      [c (object!)])
+(let ([a (entity!)]
+      [b (entity!)]
+      [c (entity!)])
   (check-not-equal? a b)
   (check-not-equal? b c)
   (check-not-equal? a c)
   (check-pred string? a)
-  (displayln "PASS 1 — objects get unique opaque IDs"))
+  (displayln "PASS 1 — entities get unique opaque IDs"))
 
 ;; 2. Claims have l/p/r structure pointing to objects
 (reset-store!)
-(let* ([x (object!)]
-       [p (object!)]
-       [y (object!)]
+(let* ([x (entity!)]
+       [p (entity!)]
+       [y (entity!)]
        [c (claim! x p y)]
        [found (claims-about x)])
   (check-equal? (length found) 1)
@@ -31,38 +29,33 @@
 
 ;; 3. Predicates are ordinary objects
 (reset-store!)
-(let ([p (object!)])
+(let ([p (entity!)])
   (check-not-false (member p (all-objects)))
-  ;; use it as predicate
-  (let ([a (object!)] [b (object!)])
+  (let ([a (entity!)] [b (entity!)])
     (claim! a p b)
-    ;; p still in objects, no special bucket
     (check-not-false (member p (all-objects))))
   (displayln "PASS 3 — predicates are ordinary objects"))
 
-;; 4. Values ground through objects
+;; 4. Values ground through interned value objects
 (reset-store!)
 (let ([v (value! "hello")])
   (check-equal? (resolve-value v) "hello")
   (check-not-false (member v (all-objects)))
-  ;; bare object has no value
-  (let ([o (object!)])
+  (let ([o (entity!)])
     (check-false (resolve-value o)))
-  (displayln "PASS 4 — values ground through objects"))
+  (displayln "PASS 4 — values ground through value objects"))
 
 ;; 5. Claims are objects (can appear in l/p/r of other claims)
 (reset-store!)
-(let* ([a (object!)]
-       [p (object!)]
-       [b (object!)]
+(let* ([a (entity!)]
+       [p (entity!)]
+       [b (entity!)]
        [c1 (claim! a p b)]
-       ;; c1 is an object — use it in another claim
-       [meta-p (object!)]
-       [tag (object!)]
+       [meta-p (entity!)]
+       [tag (entity!)]
        [c2 (claim! c1 meta-p tag)])
   (check-not-false (member c1 (all-objects)))
   (check-not-false (member c2 (all-objects)))
-  ;; can query claims about the claim-object
   (let ([about-c1 (claims-about c1)])
     (check-equal? (length about-c1) 1)
     (check-equal? (third (first about-c1)) tag))
@@ -72,48 +65,48 @@
 (reset-store!)
 (let* ([tom (named! "tom")]
        [sym-claims (claims-about tom)])
-  ;; named! creates a claim linking tom -> symbol -> value("tom")
   (check-true (>= (length sym-claims) 1))
-  ;; the symbol is stored as a claim, not baked into the ID
   (check-pred string? tom)
   (check-false (equal? tom "tom"))
-  ;; resolve round-trips
   (check-equal? (resolve-symbol "tom") tom)
   (displayln "PASS 6 — symbols are claims, not IDs"))
 
 ;; 7. Rename is cheap (one claim, references don't change)
 (reset-store!)
 (let* ([alice-id (named! "alice")]
-       [p (object!)]
-       [b (object!)]
+       [p (entity!)]
+       [b (entity!)]
        [c (claim! alice-id p b)])
-  ;; rename: attach a new symbol claim
-  (named! "bob")  ; different object — we want to rename alice-id
-  ;; Actually: rename means new symbol claim on same object.
-  ;; Remove old symbol claim and add new one.
-  ;; In this minimal store we just add another symbol claim.
+  (named! "bob")
   (claim! alice-id (symbol-predicate-id) (value! "alicia"))
-  ;; alice-id hasn't changed
   (check-equal? (resolve-symbol "alicia") alice-id)
-  ;; existing claim still points at alice-id, untouched
   (let ([found (claims-about alice-id)])
-    (check-true (>= (length found) 2))) ; symbol + the p->b claim + rename
+    (check-true (>= (length found) 2)))
   (displayln "PASS 7 — rename is cheap"))
 
 ;; 8. claim-v! is sugar over value! + claim!
 (reset-store!)
-(let* ([a (object!)]
-       [p (object!)]
+(let* ([a (entity!)]
+       [p (entity!)]
        [objs-before (length (all-objects))])
   (define-values (cid vid) (claim-v! a p "42"))
   (let ([objs-after (length (all-objects))])
-    ;; should have added exactly 2 objects: the value and the claim
     (check-equal? (- objs-after objs-before) 2)
     (check-equal? (resolve-value vid) "42")
-    ;; the claim links a -> p -> vid
     (let ([row (first (claims-where #:l a #:p p #:r vid))])
       (check-equal? (first row) cid)))
   (displayln "PASS 8 — claim-v! is sugar over value! + claim!"))
+
+;; 9. Value interning — same literal returns same ID
+(reset-store!)
+(let* ([v1 (value! "hello")]
+       [v2 (value! "hello")]
+       [v3 (value! "world")])
+  (check-equal? v1 v2)
+  (check-not-equal? v1 v3)
+  (check-equal? (resolve-value v1) "hello")
+  (check-equal? (resolve-value v3) "world")
+  (displayln "PASS 9 — value interning"))
 
 (displayln "")
 (displayln "All tests passed.")

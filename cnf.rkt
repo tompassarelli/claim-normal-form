@@ -1,7 +1,8 @@
 #lang racket
 
-(provide object!
+(provide entity!
          value!
+         value-id
          claim!
          named!
          claim-v!
@@ -15,11 +16,16 @@
          symbol-predicate-id)
 
 ;; --- Store ---
+;; objects(id)            — all addressable identities
+;; values(id, literal)    — subset grounded to host literals (interned)
+;; claims(id, l, p, r)    — subset asserting a triple
 
 (struct claim-rec (l p r) #:transparent)
 
 (define next-id (make-parameter 0))
-(define objects (make-parameter (make-hash)))   ; id -> value or #f
+(define objects (make-parameter (make-hash)))   ; id -> #t
+(define values* (make-parameter (make-hash)))   ; id -> literal
+(define val-intern (make-parameter (make-hash))) ; literal -> id
 (define claims  (make-parameter (make-hash)))   ; id -> claim-rec
 
 (define symbol-predicate-id (make-parameter #f))
@@ -33,19 +39,25 @@
 
 ;; --- Core constructors ---
 
-(define (object!)
+(define (entity!)
   (define id (fresh-id!))
-  (hash-set! (objects) id #f)
+  (hash-set! (objects) id #t)
   id)
 
 (define (value! val)
-  (define id (fresh-id!))
-  (hash-set! (objects) id val)
-  id)
+  (define existing (hash-ref (val-intern) val #f))
+  (cond
+    [existing existing]
+    [else
+     (define id (fresh-id!))
+     (hash-set! (objects) id #t)
+     (hash-set! (values*) id val)
+     (hash-set! (val-intern) val id)
+     id]))
 
 (define (claim! l p r)
   (define id (fresh-id!))
-  (hash-set! (objects) id #f)
+  (hash-set! (objects) id #t)
   (hash-set! (claims) id (claim-rec l p r))
   id)
 
@@ -54,10 +66,11 @@
 (define (bootstrap!)
   (next-id 0)
   (objects (make-hash))
+  (values* (make-hash))
+  (val-intern (make-hash))
   (claims  (make-hash))
-  (define sym-id (object!))
+  (define sym-id (entity!))
   (symbol-predicate-id sym-id)
-  ;; self-name: the symbol predicate is named "symbol"
   (claim! sym-id sym-id (value! "symbol"))
   (void))
 
@@ -66,7 +79,7 @@
 ;; --- Sugar ---
 
 (define (named! sym)
-  (define obj (object!))
+  (define obj (entity!))
   (claim! obj (symbol-predicate-id) (value! sym))
   obj)
 
@@ -75,14 +88,17 @@
   (define cid (claim! l p vid))
   (values cid vid))
 
+(define (value-id val)
+  (hash-ref (val-intern) val #f))
+
 (define (resolve-symbol sym)
   (for/first ([(cid rec) (in-hash (claims))]
               #:when (equal? (claim-rec-p rec) (symbol-predicate-id))
-              #:when (equal? (hash-ref (objects) (claim-rec-r rec) #f) sym))
+              #:when (equal? (hash-ref (values*) (claim-rec-r rec) #f) sym))
     (claim-rec-l rec)))
 
 (define (resolve-value id)
-  (hash-ref (objects) id #f))
+  (hash-ref (values*) id #f))
 
 ;; --- Query ---
 
