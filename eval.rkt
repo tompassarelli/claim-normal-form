@@ -76,12 +76,14 @@
 (define (has-eval-event? expr-id)
   (not (null? (current-claims-where #:p (evaluated-pred) #:r expr-id))))
 
-(define (eval-step! env)
+(define (eval-step! env #:only [only #f])
   (define results (query (ready (? expr) (? op) (? lval) (? rval))))
   (define candidates
     (filter (λ (s)
+              (define expr-id (hash-ref s 'expr))
               (and (hash-ref (primitives) (hash-ref s 'op) #f)
-                   (not (has-eval-event? (hash-ref s 'expr)))))
+                   (not (has-eval-event? expr-id))
+                   (or (not only) (member expr-id only))))
             results))
   (cond
     [(null? candidates) #f]
@@ -103,10 +105,10 @@
 
 ;; --- Run to fixpoint ---
 
-(define (run! env)
-  (define ev (eval-step! env))
+(define (run! env #:only [only #f])
+  (define ev (eval-step! env #:only only))
   (if ev
-      (cons ev (run! env))
+      (cons ev (run! env #:only only))
       '()))
 
 ;; --- Result reader ---

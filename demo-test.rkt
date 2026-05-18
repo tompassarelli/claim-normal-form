@@ -191,5 +191,39 @@
   (check-true (null? old-current))
   (displayln "PASS 7 — old eval events preserved as provenance"))
 
+;; 8. Affected-only: unevaluated independent expr stays unevaluated after recompute
+(reset-store!)
+(reset-rules!)
+(setup-eval!)
+(setup-graph!)
+
+(let* ([add-op (named! "add")]
+       [mul-op (named! "multiply")]
+       [one (value! 1)]
+       [two (value! 2)]
+       [four (value! 4)]
+       [expr-1 (expr! add-op one two)]
+       [expr-2 (expr! mul-op expr-1 four)]
+       [env (entity!)])
+  (register-primitive! add-op +)
+  (register-primitive! mul-op *)
+  ;; Evaluate expr-1 and expr-2
+  (define evs (run! env))
+  (check-equal? (length evs) 2)
+  ;; Now add an independent expression that is ready but NOT yet evaluated
+  (define ten (value! 10))
+  (define twenty (value! 20))
+  (define expr-3 (expr! add-op ten twenty))
+  ;; Change expr-1 and recompute affected only
+  (change-operand! expr-1 (right-pred) two (value! 5))
+  (define-values (affected-ids new-evs) (recompute-affected! env expr-1))
+  ;; expr-1 and expr-2 recomputed
+  (check-equal? (length new-evs) 2)
+  ;; expr-3 must still be unevaluated — not touched by affected-only recompute
+  (check-false (member expr-3 affected-ids))
+  (define expr-3-ev (current-claims-where #:p (evaluated-pred) #:r expr-3))
+  (check-true (null? expr-3-ev))
+  (displayln "PASS 8 — unevaluated independent expr stays unevaluated"))
+
 (displayln "")
 (displayln "All demo tests passed.")

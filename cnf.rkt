@@ -3,6 +3,7 @@
 (provide entity!
          value!
          value-id
+         value-object?
          claim!
          named!
          claim-v!
@@ -28,6 +29,21 @@
 (define val-intern (make-parameter (make-hash))) ; literal -> id
 (define claims  (make-parameter (make-hash)))   ; id -> claim-rec
 
+;; --- Indexes ---
+
+(define idx-by-l  (make-parameter (make-hash)))  ; l -> (listof cid)
+(define idx-by-p  (make-parameter (make-hash)))  ; p -> (listof cid)
+(define idx-by-r  (make-parameter (make-hash)))  ; r -> (listof cid)
+(define idx-by-lp (make-parameter (make-hash)))  ; (l . p) -> (listof cid)
+(define idx-by-pr (make-parameter (make-hash)))  ; (p . r) -> (listof cid)
+
+(define (index-claim! cid l p r)
+  (hash-update! (idx-by-l) l (λ (old) (cons cid old)) '())
+  (hash-update! (idx-by-p) p (λ (old) (cons cid old)) '())
+  (hash-update! (idx-by-r) r (λ (old) (cons cid old)) '())
+  (hash-update! (idx-by-lp) (cons l p) (λ (old) (cons cid old)) '())
+  (hash-update! (idx-by-pr) (cons p r) (λ (old) (cons cid old)) '()))
+
 (define symbol-predicate-id (make-parameter #f))
 
 ;; --- ID generation ---
@@ -45,9 +61,9 @@
   id)
 
 (define (value! val)
-  (define existing (hash-ref (val-intern) val #f))
   (cond
-    [existing existing]
+    [(hash-has-key? (val-intern) val)
+     (hash-ref (val-intern) val)]
     [else
      (define id (fresh-id!))
      (hash-set! (objects) id #t)
@@ -59,6 +75,7 @@
   (define id (fresh-id!))
   (hash-set! (objects) id #t)
   (hash-set! (claims) id (claim-rec l p r))
+  (index-claim! id l p r)
   id)
 
 ;; --- Bootstrap ---
@@ -69,6 +86,11 @@
   (values* (make-hash))
   (val-intern (make-hash))
   (claims  (make-hash))
+  (idx-by-l (make-hash))
+  (idx-by-p (make-hash))
+  (idx-by-r (make-hash))
+  (idx-by-lp (make-hash))
+  (idx-by-pr (make-hash))
   (define sym-id (entity!))
   (symbol-predicate-id sym-id)
   (claim! sym-id sym-id (value! "symbol"))
@@ -88,14 +110,18 @@
   (define cid (claim! l p vid))
   (values cid vid))
 
+(define (value-object? id)
+  (hash-has-key? (values*) id))
+
 (define (value-id val)
   (hash-ref (val-intern) val #f))
 
 (define (resolve-symbol sym)
-  (for/first ([(cid rec) (in-hash (claims))]
-              #:when (equal? (claim-rec-p rec) (symbol-predicate-id))
-              #:when (equal? (hash-ref (values*) (claim-rec-r rec) #f) sym))
-    (claim-rec-l rec)))
+  (define vid (value-id sym))
+  (and vid
+       (let ([cids (hash-ref (idx-by-pr) (cons (symbol-predicate-id) vid) '())])
+         (and (not (null? cids))
+              (claim-rec-l (hash-ref (claims) (first cids)))))))
 
 (define (resolve-value id)
   (hash-ref (values*) id #f))
@@ -103,21 +129,34 @@
 ;; --- Query ---
 
 (define (claims-about id)
-  (for/list ([(cid rec) (in-hash (claims))]
-             #:when (equal? (claim-rec-l rec) id))
+  (for/list ([cid (in-list (hash-ref (idx-by-l) id '()))])
+    (define rec (hash-ref (claims) cid))
     (list cid (claim-rec-p rec) (claim-rec-r rec))))
 
 (define (claims-targeting id)
-  (for/list ([(cid rec) (in-hash (claims))]
-             #:when (equal? (claim-rec-r rec) id))
+  (for/list ([cid (in-list (hash-ref (idx-by-r) id '()))])
+    (define rec (hash-ref (claims) cid))
     (list cid (claim-rec-p rec) (claim-rec-l rec))))
 
 (define (claims-where #:l [l #f] #:p [p #f] #:r [r #f])
-  (for/list ([(cid rec) (in-hash (claims))]
-             #:when (or (not l) (equal? (claim-rec-l rec) l))
-             #:when (or (not p) (equal? (claim-rec-p rec) p))
-             #:when (or (not r) (equal? (claim-rec-r rec) r)))
-    (list cid (claim-rec-p rec) (claim-rec-l rec) (claim-rec-r rec))))
+  (cond
+    [(not (or l p r))
+     (for/list ([(cid rec) (in-hash (claims))])
+       (list cid (claim-rec-p rec) (claim-rec-l rec) (claim-rec-r rec)))]
+    [else
+     (define cids
+       (cond
+         [(and l p) (hash-ref (idx-by-lp) (cons l p) '())]
+         [(and p r) (hash-ref (idx-by-pr) (cons p r) '())]
+         [l (hash-ref (idx-by-l) l '())]
+         [p (hash-ref (idx-by-p) p '())]
+         [r (hash-ref (idx-by-r) r '())]))
+     (for*/list ([cid (in-list cids)]
+                 [rec (in-value (hash-ref (claims) cid))]
+                 #:when (or (not l) (equal? (claim-rec-l rec) l))
+                 #:when (or (not p) (equal? (claim-rec-p rec) p))
+                 #:when (or (not r) (equal? (claim-rec-r rec) r)))
+       (list cid (claim-rec-p rec) (claim-rec-l rec) (claim-rec-r rec)))]))
 
 (define (all-objects)
   (hash-keys (objects)))

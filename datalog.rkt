@@ -109,7 +109,7 @@
   ;; Values and objects
   (hash-set! db 'value
     (for/list ([id (all-objects)]
-               #:when (resolve-value id))
+               #:when (value-object? id))
       (list id (resolve-value id))))
   (hash-set! db 'object
     (for/list ([id (all-objects)])
@@ -222,7 +222,7 @@
          (string-join
           (sort
            (for/list ([(k v) (in-hash s)])
-             (define display-v (or (resolve-value v) v))
+             (define display-v (if (value-object? v) (resolve-value v) v))
              (format "?~a = ~a" k display-v))
            string<?)
           ", ")))))

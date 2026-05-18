@@ -105,5 +105,5 @@
   (define affected-ids (affected-by changed-expr-id))
   (for ([expr-id (in-list affected-ids)])
     (invalidate-eval-events! expr-id))
-  (define new-evs (run! env))
+  (define new-evs (run! env #:only affected-ids))
   (values affected-ids new-evs))

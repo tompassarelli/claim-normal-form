@@ -32,6 +32,7 @@ EAV defines roles inside a fact, CNF defines kinds of addressable object.
 ```racket
 (entity!)              ; pure referent — the thing before description
 (value! "Tom")         ; canonical literal — interned (same string = same ID)
+(value-object? id)     ; #t if id is a value object (use instead of truthiness)
 (claim! left pred right) ; assertion connecting objects
 
 (named! "edge")        ; sugar: entity + symbol claim
@@ -40,12 +41,16 @@ EAV defines roles inside a fact, CNF defines kinds of addressable object.
 (resolve-symbol "edge") ; find entity by symbol name
 (resolve-value id)      ; look up literal grounding
 (claims-about id)       ; claims where id is left
-(claims-where #:l l #:p p #:r r)  ; filtered claim query
+(claims-where #:l l #:p p #:r r)  ; filtered claim query (indexed)
 ```
+
+Claim lookups are indexed by `l`, `p`, `r`, `(l,p)`, and `(p,r)`.
+Constrained queries hit the appropriate index instead of scanning
+all claims.
 
 ## Datalog (`datalog.rkt`)
 
-Bottom-up fixpoint evaluation over the claim graph.
+Bottom-up naive fixpoint evaluation over the claim graph.
 
 ```racket
 (require "cnf.rkt" "datalog.rkt")
@@ -73,6 +78,7 @@ Base relations:
 - `(triple L P R)` — convenience projection
 - `(current-claim Id L P R)` — unsuperseded claims only
 - `(current-triple L P R)` — unsuperseded triples only
+- `(value Id Literal)` — value objects and their grounded literals
 - `(object Id)` — all object IDs
 
 ## Evaluator (`eval.rkt`)
@@ -143,11 +149,36 @@ recompute — built on claims about claims.
 
 Run `racket demo.rkt` to see the full demonstration.
 
+## Performance
+
+Claim store lookups are indexed — `claims-where` with constraints
+uses hash indexes rather than full scans.
+
+Incremental recompute touches only the affected subgraph:
+
+```
+105 expressions (5-deep chain + 100 independent)
+Full build:        ~4000 ms
+Incremental (5):   ~400 ms   (10x faster, 100 nodes untouched)
+```
+
+Run `racket bench.rkt` to reproduce.
+
+**Honest limitations:**
+- Datalog uses naive bottom-up fixpoint — each eval step runs a full
+  fixpoint pass over all derived facts. This is the performance
+  bottleneck, not claim lookup.
+- Indexes accelerate `claims-where` and `current-claims-where`, but
+  the Datalog engine itself does not yet use them during fixpoint
+  iteration.
+- The incremental win comes from evaluating fewer steps (5 instead
+  of 105), not from faster individual steps.
+
 ## Tests
 
 ```
-racket cnf-test.rkt      # 9 kernel tests
+racket cnf-test.rkt      # 10 kernel tests
 racket datalog-test.rkt  # 9 datalog tests
 racket eval-test.rkt     # 6 evaluator tests
-racket demo-test.rkt     # 7 graph layer tests
+racket demo-test.rkt     # 8 graph layer tests
 ```

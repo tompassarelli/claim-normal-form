@@ -108,5 +108,19 @@
   (check-equal? (resolve-value v3) "world")
   (displayln "PASS 9 — value interning"))
 
+;; 10. Value #f is a valid literal — not confused with "no grounding"
+(reset-store!)
+(let* ([vf1 (value! #f)]
+       [vf2 (value! #f)]
+       [vt (value! #t)])
+  (check-equal? vf1 vf2)
+  (check-not-equal? vf1 vt)
+  (check-equal? (resolve-value vf1) #f)
+  (check-equal? (resolve-value vt) #t)
+  (check-true (value-object? vf1))
+  (check-true (value-object? vt))
+  (check-false (value-object? (entity!)))
+  (displayln "PASS 10 — #f is a valid value literal"))
+
 (displayln "")
 (displayln "All tests passed.")
