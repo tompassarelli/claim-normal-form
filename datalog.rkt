@@ -7,7 +7,10 @@
          define-rule
          query
          show-results
-         reset-rules!)
+         reset-rules!
+         supersedes-pred-id
+         set-supersedes-pred!
+         current-claims-where)
 
 ;; Datalog over CNF — naive bottom-up fixpoint evaluation.
 ;;
@@ -28,6 +31,21 @@
   (var 'name))
 
 (define rules (make-parameter '()))
+
+(define supersedes-pred-id (make-parameter #f))
+
+(define (set-supersedes-pred! id)
+  (supersedes-pred-id id))
+
+(define (current-claims-where #:l [l #f] #:p [p #f] #:r [r #f])
+  (define sup-id (supersedes-pred-id))
+  (define all (claims-where #:l l #:p p #:r r))
+  (if sup-id
+      (let ([superseded (make-hash)])
+        (for ([row (claims-where #:p sup-id)])
+          (hash-set! superseded (list-ref row 3) #t))
+        (filter (λ (c) (not (hash-ref superseded (first c) #f))) all))
+      all))
 
 (define (reset-rules!)
   (rules '()))
@@ -54,6 +72,14 @@
 (define (extract-edb)
   (define db (make-hash))
   (define all-claims (claims-where))
+  ;; Compute superseded claim IDs
+  (define sup-id (supersedes-pred-id))
+  (define superseded (make-hash))
+  (when sup-id
+    (for ([row (in-list all-claims)]
+          #:when (equal? (list-ref row 1) sup-id))
+      (hash-set! superseded (list-ref row 3) #t)))
+  ;; All claims (including superseded)
   (hash-set! db 'claim
     (for/list ([row all-claims])
       (list (list-ref row 0)
@@ -65,6 +91,22 @@
       (list (list-ref row 2)
             (list-ref row 1)
             (list-ref row 3))))
+  ;; Current claims (not superseded)
+  (define current
+    (filter (λ (row) (not (hash-ref superseded (list-ref row 0) #f)))
+            all-claims))
+  (hash-set! db 'current-claim
+    (for/list ([row current])
+      (list (list-ref row 0)
+            (list-ref row 2)
+            (list-ref row 1)
+            (list-ref row 3))))
+  (hash-set! db 'current-triple
+    (for/list ([row current])
+      (list (list-ref row 2)
+            (list-ref row 1)
+            (list-ref row 3))))
+  ;; Values and objects
   (hash-set! db 'value
     (for/list ([id (all-objects)]
                #:when (resolve-value id))

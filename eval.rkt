@@ -51,13 +51,13 @@
     (value (? operand) (? _lit)))
   ;; An operand resolves via a prior eval event's result
   (define-rule (operand-val (? operand) (? result-val))
-    (triple (? ev) (evaluated-pred) (? operand))
-    (triple (? ev) (result-pred) (? result-val)))
+    (current-triple (? ev) (evaluated-pred) (? operand))
+    (current-triple (? ev) (result-pred) (? result-val)))
   ;; An expression is ready when it has op + both operands resolve
   (define-rule (ready (? expr) (? op) (? lval) (? rval))
-    (triple (? expr) (op-pred) (? op))
-    (triple (? expr) (left-pred) (? left))
-    (triple (? expr) (right-pred) (? right))
+    (current-triple (? expr) (op-pred) (? op))
+    (current-triple (? expr) (left-pred) (? left))
+    (current-triple (? expr) (right-pred) (? right))
     (operand-val (? left) (? lval))
     (operand-val (? right) (? rval)))
   (void))
@@ -74,7 +74,7 @@
 ;; --- Stepping ---
 
 (define (has-eval-event? expr-id)
-  (not (null? (claims-where #:p (evaluated-pred) #:r expr-id))))
+  (not (null? (current-claims-where #:p (evaluated-pred) #:r expr-id))))
 
 (define (eval-step! env)
   (define results (query (ready (? expr) (? op) (? lval) (? rval))))

@@ -71,6 +71,8 @@ Bottom-up fixpoint evaluation over the claim graph.
 Base relations:
 - `(claim Id L P R)` — full claim with object ID
 - `(triple L P R)` — convenience projection
+- `(current-claim Id L P R)` — unsuperseded claims only
+- `(current-triple L P R)` — unsuperseded triples only
 - `(object Id)` — all object IDs
 
 ## Evaluator (`eval.rkt`)
@@ -109,10 +111,43 @@ Eval events are ordinary claims — queryable like anything else:
 (query (triple (? ev) (result-pred) (? val)))
 ```
 
+## Graph layer (`graph.rkt`)
+
+Supersession, semantic rename, dependency tracking, incremental
+recompute — built on claims about claims.
+
+```racket
+(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt")
+
+(setup-eval!)
+(setup-graph!)
+
+;; Names are claims, not identity
+(define fn-1 (entity!))
+(give-name! fn-1 "calculate-pay")
+(render-ref fn-1)  ; => "calculate-pay"
+
+;; Rename: one new claim, zero references changed
+(rename! fn-1 "compute-pay")
+(render-ref fn-1)  ; => "compute-pay"
+
+;; Dependencies derived from graph structure, not declared
+;; expr-depends-on and affected are Datalog rules over current-triple
+
+;; Incremental recompute: change one operand, recompute only affected
+(change-operand! expr-1 (right-pred) old-val new-val)
+(recompute-affected! env expr-1)
+;; Only downstream expressions re-evaluated; unaffected nodes untouched
+;; Old eval events remain queryable as provenance
+```
+
+Run `racket demo.rkt` to see the full demonstration.
+
 ## Tests
 
 ```
 racket cnf-test.rkt      # 9 kernel tests
 racket datalog-test.rkt  # 9 datalog tests
 racket eval-test.rkt     # 6 evaluator tests
+racket demo-test.rkt     # 7 graph layer tests
 ```
