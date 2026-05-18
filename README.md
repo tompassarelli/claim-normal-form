@@ -1,6 +1,9 @@
-# claim-normal-form-racket
+# claim-normal-form
 
-Racket implementation of [Claim Normal Form](https://github.com/tompassarelli/claim-normal-form) — in-memory kernel + Datalog query engine.
+A data-modeling normal form where everything is objects and claims.
+In-memory Racket kernel + Datalog query engine.
+
+See [specification.md](specification.md) for the full spec.
 
 ## The ontology
 
