@@ -14,89 +14,102 @@
          claims-where
          all-objects
          reset-store!
-         symbol-predicate-id)
+         symbol-predicate-id
+         cnf-ctx?
+         current-ctx
+         make-cnf-ctx
+         ctx-ref
+         ctx-set!)
+
+;; --- Context ---
+
+(struct cnf-ctx
+  (next-id        ; box(integer)
+   objects        ; mutable-hash: id -> #t
+   values         ; mutable-hash: id -> literal
+   val-intern     ; mutable-hash: literal -> id
+   claims         ; mutable-hash: id -> claim-rec
+   idx-by-l       ; mutable-hash: l -> (listof cid)
+   idx-by-p       ; mutable-hash: p -> (listof cid)
+   idx-by-r       ; mutable-hash: r -> (listof cid)
+   idx-by-lp      ; mutable-hash: (l . p) -> (listof cid)
+   idx-by-pr      ; mutable-hash: (p . r) -> (listof cid)
+   symbol-pred-id ; box(string-or-#f)
+   ext))          ; mutable-hash: symbol -> any (module extensions)
+
+(define current-ctx (make-parameter #f))
+
+(define (ctx-ref key [default #f])
+  (hash-ref (cnf-ctx-ext (current-ctx)) key default))
+
+(define (ctx-set! key val)
+  (hash-set! (cnf-ctx-ext (current-ctx)) key val))
 
 ;; --- Store ---
-;; objects(id)            — all addressable identities
-;; values(id, literal)    — subset grounded to host literals (interned)
-;; claims(id, l, p, r)    — subset asserting a triple
 
 (struct claim-rec (l p r) #:transparent)
-
-(define next-id (make-parameter 0))
-(define objects (make-parameter (make-hash)))   ; id -> #t
-(define values* (make-parameter (make-hash)))   ; id -> literal
-(define val-intern (make-parameter (make-hash))) ; literal -> id
-(define claims  (make-parameter (make-hash)))   ; id -> claim-rec
-
-;; --- Indexes ---
-
-(define idx-by-l  (make-parameter (make-hash)))  ; l -> (listof cid)
-(define idx-by-p  (make-parameter (make-hash)))  ; p -> (listof cid)
-(define idx-by-r  (make-parameter (make-hash)))  ; r -> (listof cid)
-(define idx-by-lp (make-parameter (make-hash)))  ; (l . p) -> (listof cid)
-(define idx-by-pr (make-parameter (make-hash)))  ; (p . r) -> (listof cid)
-
-(define (index-claim! cid l p r)
-  (hash-update! (idx-by-l) l (λ (old) (cons cid old)) '())
-  (hash-update! (idx-by-p) p (λ (old) (cons cid old)) '())
-  (hash-update! (idx-by-r) r (λ (old) (cons cid old)) '())
-  (hash-update! (idx-by-lp) (cons l p) (λ (old) (cons cid old)) '())
-  (hash-update! (idx-by-pr) (cons p r) (λ (old) (cons cid old)) '()))
-
-(define symbol-predicate-id (make-parameter #f))
 
 ;; --- ID generation ---
 
 (define (fresh-id!)
-  (define n (add1 (next-id)))
-  (next-id n)
+  (define b (cnf-ctx-next-id (current-ctx)))
+  (define n (add1 (unbox b)))
+  (set-box! b n)
   (number->string n))
 
 ;; --- Core constructors ---
 
 (define (entity!)
+  (define ctx (current-ctx))
   (define id (fresh-id!))
-  (hash-set! (objects) id #t)
+  (hash-set! (cnf-ctx-objects ctx) id #t)
   id)
 
 (define (value! val)
+  (define ctx (current-ctx))
+  (define vi (cnf-ctx-val-intern ctx))
   (cond
-    [(hash-has-key? (val-intern) val)
-     (hash-ref (val-intern) val)]
+    [(hash-has-key? vi val)
+     (hash-ref vi val)]
     [else
      (define id (fresh-id!))
-     (hash-set! (objects) id #t)
-     (hash-set! (values*) id val)
-     (hash-set! (val-intern) val id)
+     (hash-set! (cnf-ctx-objects ctx) id #t)
+     (hash-set! (cnf-ctx-values ctx) id val)
+     (hash-set! vi val id)
      id]))
 
+(define (index-claim! cid l p r)
+  (define ctx (current-ctx))
+  (hash-update! (cnf-ctx-idx-by-l ctx) l (lambda (old) (cons cid old)) '())
+  (hash-update! (cnf-ctx-idx-by-p ctx) p (lambda (old) (cons cid old)) '())
+  (hash-update! (cnf-ctx-idx-by-r ctx) r (lambda (old) (cons cid old)) '())
+  (hash-update! (cnf-ctx-idx-by-lp ctx) (cons l p) (lambda (old) (cons cid old)) '())
+  (hash-update! (cnf-ctx-idx-by-pr ctx) (cons p r) (lambda (old) (cons cid old)) '()))
+
 (define (claim! l p r)
+  (define ctx (current-ctx))
   (define id (fresh-id!))
-  (hash-set! (objects) id #t)
-  (hash-set! (claims) id (claim-rec l p r))
+  (hash-set! (cnf-ctx-objects ctx) id #t)
+  (hash-set! (cnf-ctx-claims ctx) id (claim-rec l p r))
   (index-claim! id l p r)
   id)
 
 ;; --- Bootstrap ---
 
-(define (bootstrap!)
-  (next-id 0)
-  (objects (make-hash))
-  (values* (make-hash))
-  (val-intern (make-hash))
-  (claims  (make-hash))
-  (idx-by-l (make-hash))
-  (idx-by-p (make-hash))
-  (idx-by-r (make-hash))
-  (idx-by-lp (make-hash))
-  (idx-by-pr (make-hash))
-  (define sym-id (entity!))
-  (symbol-predicate-id sym-id)
-  (claim! sym-id sym-id (value! "symbol"))
-  (void))
+(define (make-cnf-ctx)
+  (define ctx
+    (cnf-ctx
+     (box 0) (make-hash) (make-hash) (make-hash) (make-hash)
+     (make-hash) (make-hash) (make-hash) (make-hash) (make-hash)
+     (box #f) (make-hash)))
+  (parameterize ([current-ctx ctx])
+    (define sym-id (entity!))
+    (set-box! (cnf-ctx-symbol-pred-id ctx) sym-id)
+    (claim! sym-id sym-id (value! "symbol")))
+  ctx)
 
-(bootstrap!)
+(define (symbol-predicate-id)
+  (unbox (cnf-ctx-symbol-pred-id (current-ctx))))
 
 ;; --- Sugar ---
 
@@ -111,57 +124,66 @@
   (values cid vid))
 
 (define (value-object? id)
-  (hash-has-key? (values*) id))
+  (hash-has-key? (cnf-ctx-values (current-ctx)) id))
 
 (define (value-id val)
-  (hash-ref (val-intern) val #f))
+  (hash-ref (cnf-ctx-val-intern (current-ctx)) val #f))
 
 (define (resolve-symbol sym)
+  (define ctx (current-ctx))
   (define vid (value-id sym))
   (and vid
-       (let ([cids (hash-ref (idx-by-pr) (cons (symbol-predicate-id) vid) '())])
+       (let ([cids (hash-ref (cnf-ctx-idx-by-pr ctx)
+                              (cons (symbol-predicate-id) vid) '())])
          (and (not (null? cids))
-              (claim-rec-l (hash-ref (claims) (first cids)))))))
+              (claim-rec-l (hash-ref (cnf-ctx-claims ctx) (first cids)))))))
 
 (define (resolve-value id)
-  (hash-ref (values*) id #f))
+  (hash-ref (cnf-ctx-values (current-ctx)) id #f))
 
 ;; --- Query ---
 
 (define (claims-about id)
-  (for/list ([cid (in-list (hash-ref (idx-by-l) id '()))])
-    (define rec (hash-ref (claims) cid))
+  (define ctx (current-ctx))
+  (for/list ([cid (in-list (hash-ref (cnf-ctx-idx-by-l ctx) id '()))])
+    (define rec (hash-ref (cnf-ctx-claims ctx) cid))
     (list cid (claim-rec-p rec) (claim-rec-r rec))))
 
 (define (claims-targeting id)
-  (for/list ([cid (in-list (hash-ref (idx-by-r) id '()))])
-    (define rec (hash-ref (claims) cid))
+  (define ctx (current-ctx))
+  (for/list ([cid (in-list (hash-ref (cnf-ctx-idx-by-r ctx) id '()))])
+    (define rec (hash-ref (cnf-ctx-claims ctx) cid))
     (list cid (claim-rec-p rec) (claim-rec-l rec))))
 
 (define (claims-where #:l [l #f] #:p [p #f] #:r [r #f])
+  (define ctx (current-ctx))
   (cond
     [(not (or l p r))
-     (for/list ([(cid rec) (in-hash (claims))])
+     (for/list ([(cid rec) (in-hash (cnf-ctx-claims ctx))])
        (list cid (claim-rec-p rec) (claim-rec-l rec) (claim-rec-r rec)))]
     [else
      (define cids
        (cond
-         [(and l p) (hash-ref (idx-by-lp) (cons l p) '())]
-         [(and p r) (hash-ref (idx-by-pr) (cons p r) '())]
-         [l (hash-ref (idx-by-l) l '())]
-         [p (hash-ref (idx-by-p) p '())]
-         [r (hash-ref (idx-by-r) r '())]))
+         [(and l p) (hash-ref (cnf-ctx-idx-by-lp ctx) (cons l p) '())]
+         [(and p r) (hash-ref (cnf-ctx-idx-by-pr ctx) (cons p r) '())]
+         [l (hash-ref (cnf-ctx-idx-by-l ctx) l '())]
+         [p (hash-ref (cnf-ctx-idx-by-p ctx) p '())]
+         [r (hash-ref (cnf-ctx-idx-by-r ctx) r '())]))
      (for*/list ([cid (in-list cids)]
-                 [rec (in-value (hash-ref (claims) cid))]
+                 [rec (in-value (hash-ref (cnf-ctx-claims ctx) cid))]
                  #:when (or (not l) (equal? (claim-rec-l rec) l))
                  #:when (or (not p) (equal? (claim-rec-p rec) p))
                  #:when (or (not r) (equal? (claim-rec-r rec) r)))
        (list cid (claim-rec-p rec) (claim-rec-l rec) (claim-rec-r rec)))]))
 
 (define (all-objects)
-  (hash-keys (objects)))
+  (hash-keys (cnf-ctx-objects (current-ctx))))
 
 ;; --- Reset ---
 
 (define (reset-store!)
-  (bootstrap!))
+  (current-ctx (make-cnf-ctx)))
+
+;; --- Initialize default context ---
+
+(current-ctx (make-cnf-ctx))

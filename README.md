@@ -51,6 +51,19 @@ Claim lookups are indexed by `l`, `p`, `r`, `(l,p)`, and `(p,r)`.
 Constrained queries hit the appropriate index instead of scanning
 all claims.
 
+All state lives in an opaque `cnf-ctx` struct. Multiple independent
+graphs via `parameterize`:
+
+```racket
+(define ctx-a (make-cnf-ctx))
+(define ctx-b (make-cnf-ctx))
+
+(parameterize ([current-ctx ctx-a])
+  (entity!)   ; goes to ctx-a
+  (value! 42) ; goes to ctx-a
+  ...)
+```
+
 ## Datalog (`datalog.rkt`)
 
 Bottom-up naive fixpoint evaluation over the claim graph.
@@ -120,6 +133,44 @@ Eval events are ordinary claims — queryable like anything else:
 (query (triple (? ev) (result-pred) (? val)))
 ```
 
+## Schema layer (`schema.rkt`)
+
+Ergonomic data modeling — CRUD over claims without touching the
+raw kernel API.
+
+```racket
+(require "cnf.rkt" "datalog.rkt" "schema.rkt")
+
+(setup-schema!)
+
+;; Predicates are just objects — batch-create them
+(define-predicates name email status assigned-to)
+
+;; Create entities with properties
+(define alice (entity/claims [name "Alice"] [email "alice@co.com"]))
+(define bob   (entity/claims [name "Bob"]   [email "bob@co.com"]))
+
+(define task-1 (entity/claims [name "Fix login bug"] [status "open"]))
+(link! task-1 assigned-to alice)
+
+;; Lookup
+(lookup alice name)            ; => "Alice"
+(lookup task-1 assigned-to)    ; => alice's entity ID
+(find-by status "open")        ; => (list task-1)
+(find-by assigned-to alice)    ; => (list task-1)
+
+;; Update (supersession — old values preserved as history)
+(update! alice email "alice@newco.com")
+(lookup alice email)            ; => "alice@newco.com"
+
+;; Retract / unlink
+(retract! alice email)
+(unlink! task-1 assigned-to alice)
+```
+
+No tables, no schema migrations, no foreign key declarations.
+Predicates are objects. Relationships are claims. History is free.
+
 ## Graph layer (`graph.rkt`)
 
 Supersession, semantic rename, dependency tracking, incremental
@@ -180,8 +231,9 @@ Run `racket bench.rkt` to reproduce.
 ## Tests
 
 ```
-racket cnf-test.rkt      # 10 kernel tests
+racket cnf-test.rkt      # 11 kernel tests
 racket datalog-test.rkt  # 9 datalog tests
 racket eval-test.rkt     # 6 evaluator tests
 racket demo-test.rkt     # 8 graph layer tests
+racket schema-test.rkt   # 10 schema layer tests
 ```

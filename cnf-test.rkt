@@ -122,5 +122,22 @@
   (check-false (value-object? (entity!)))
   (displayln "PASS 10 — #f is a valid value literal"))
 
+;; 11. Context isolation — two contexts don't share state
+(let ([ctx-a (make-cnf-ctx)]
+      [ctx-b (make-cnf-ctx)])
+  (define alice-id
+    (parameterize ([current-ctx ctx-a])
+      (named! "alice")))
+  (define bob-id
+    (parameterize ([current-ctx ctx-b])
+      (named! "bob")))
+  (parameterize ([current-ctx ctx-a])
+    (check-equal? (resolve-symbol "alice") alice-id)
+    (check-false (resolve-symbol "bob")))
+  (parameterize ([current-ctx ctx-b])
+    (check-equal? (resolve-symbol "bob") bob-id)
+    (check-false (resolve-symbol "alice")))
+  (displayln "PASS 11 — context isolation"))
+
 (displayln "")
 (displayln "All tests passed.")

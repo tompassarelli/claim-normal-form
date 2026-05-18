@@ -17,11 +17,10 @@
 ;; Base relations (EDB):
 ;;   (claim Id L P R) — claim with its own object ID
 ;;   (triple L P R)   — projection without claim ID
+;;   (current-claim Id L P R) — unsuperseded claims only
+;;   (current-triple L P R)   — unsuperseded triples only
+;;   (value Id Literal) — value objects and their grounded literals
 ;;   (object Id)      — all object IDs
-;;
-;; Literals in query patterns resolve to their interned value ID
-;; automatically. No value/2 join needed:
-;;   (triple ?x name "Tom")  just works.
 
 (struct var (name) #:transparent)
 (struct atom (rel args) #:transparent)
@@ -30,12 +29,13 @@
 (define-syntax-rule (? name)
   (var 'name))
 
-(define rules (make-parameter '()))
+;; --- Rules and supersession state (stored in context extensions) ---
 
-(define supersedes-pred-id (make-parameter #f))
+(define (supersedes-pred-id)
+  (ctx-ref 'supersedes-pred-id #f))
 
 (define (set-supersedes-pred! id)
-  (supersedes-pred-id id))
+  (ctx-set! 'supersedes-pred-id id))
 
 (define (current-claims-where #:l [l #f] #:p [p #f] #:r [r #f])
   (define sup-id (supersedes-pred-id))
@@ -44,11 +44,11 @@
       (let ([superseded (make-hash)])
         (for ([row (claims-where #:p sup-id)])
           (hash-set! superseded (list-ref row 3) #t))
-        (filter (λ (c) (not (hash-ref superseded (first c) #f))) all))
+        (filter (lambda (c) (not (hash-ref superseded (first c) #f))) all))
       all))
 
 (define (reset-rules!)
-  (rules '()))
+  (ctx-set! 'rules '()))
 
 ;; --- Syntax ---
 
@@ -58,9 +58,10 @@
      (atom 'rel (list arg ...))]))
 
 (define-syntax-rule (define-rule (head-rel head-arg ...) body ...)
-  (rules (cons (dl-rule (atom 'head-rel (list head-arg ...))
-                        (list (parse-atom body) ...))
-               (rules))))
+  (ctx-set! 'rules
+    (cons (dl-rule (atom 'head-rel (list head-arg ...))
+                   (list (parse-atom body) ...))
+          (ctx-ref 'rules '()))))
 
 (define-syntax query
   (syntax-rules ()
@@ -72,14 +73,12 @@
 (define (extract-edb)
   (define db (make-hash))
   (define all-claims (claims-where))
-  ;; Compute superseded claim IDs
   (define sup-id (supersedes-pred-id))
   (define superseded (make-hash))
   (when sup-id
     (for ([row (in-list all-claims)]
           #:when (equal? (list-ref row 1) sup-id))
       (hash-set! superseded (list-ref row 3) #t)))
-  ;; All claims (including superseded)
   (hash-set! db 'claim
     (for/list ([row all-claims])
       (list (list-ref row 0)
@@ -91,9 +90,8 @@
       (list (list-ref row 2)
             (list-ref row 1)
             (list-ref row 3))))
-  ;; Current claims (not superseded)
   (define current
-    (filter (λ (row) (not (hash-ref superseded (list-ref row 0) #f)))
+    (filter (lambda (row) (not (hash-ref superseded (list-ref row 0) #f)))
             all-claims))
   (hash-set! db 'current-claim
     (for/list ([row current])
@@ -106,7 +104,6 @@
       (list (list-ref row 2)
             (list-ref row 1)
             (list-ref row 3))))
-  ;; Values and objects
   (hash-set! db 'value
     (for/list ([id (all-objects)]
                #:when (value-object? id))
@@ -117,9 +114,6 @@
   db)
 
 ;; --- Literal resolution ---
-;; When a constant in a pattern is not an object ID but IS a host literal
-;; that has an interned value object, resolve it to that object's ID.
-;; This lets users write "Tom" in patterns instead of joining through value/2.
 
 (define (resolve-literal v)
   (cond
@@ -155,7 +149,7 @@
 
 (define (match-atom-against-db db a subst)
   (define tuples (hash-ref db (atom-rel a) '()))
-  (filter-map (λ (tuple) (match-tuple (atom-args a) tuple subst))
+  (filter-map (lambda (tuple) (match-tuple (atom-args a) tuple subst))
               tuples))
 
 ;; --- Body evaluation ---
@@ -206,7 +200,7 @@
 (define (run-query body-atoms)
   (define resolved-query (map resolve-atom-literals body-atoms))
   (define resolved-rules
-    (for/list ([r (in-list (rules))])
+    (for/list ([r (in-list (ctx-ref 'rules '()))])
       (dl-rule (resolve-atom-literals (dl-rule-head r))
                (map resolve-atom-literals (dl-rule-body r)))))
   (define db (fixpoint (extract-edb) resolved-rules))

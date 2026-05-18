@@ -12,25 +12,23 @@
          invalidate-eval-events!
          recompute-affected!)
 
-;; --- Predicates ---
+;; --- Predicate accessors (stored in context extensions) ---
 
-(define name-pred (make-parameter #f))
-(define supersedes-pred (make-parameter #f))
+(define (name-pred) (ctx-ref 'name-pred))
+(define (supersedes-pred) (ctx-ref 'supersedes-pred))
 
 ;; --- Setup ---
 
 (define (setup-graph!)
-  (name-pred (named! "name"))
-  (supersedes-pred (named! "supersedes"))
+  (ctx-set! 'name-pred (named! "name"))
+  (ctx-set! 'supersedes-pred (named! "supersedes"))
   (set-supersedes-pred! (supersedes-pred))
-  ;; Structural dependency: expr depends on operand if operand is itself an expression
   (define-rule (expr-depends-on (? expr) (? dep))
     (current-triple (? expr) (left-pred) (? dep))
     (current-triple (? dep) (op-pred) (? _op1)))
   (define-rule (expr-depends-on (? expr) (? dep))
     (current-triple (? expr) (right-pred) (? dep))
     (current-triple (? dep) (op-pred) (? _op2)))
-  ;; Transitive affectedness
   (define-rule (affected (? x) (? changed))
     (expr-depends-on (? x) (? changed)))
   (define-rule (affected (? x) (? changed))
@@ -86,7 +84,7 @@
   (define results (query (affected (? x) changed-expr-id)))
   (remove-duplicates
    (cons changed-expr-id
-         (map (λ (s) (hash-ref s 'x)) results))))
+         (map (lambda (s) (hash-ref s 'x)) results))))
 
 ;; --- Incremental recompute ---
 

@@ -16,44 +16,31 @@
 ;; Datalog  = eyes  (derive which expressions are ready to step)
 ;; Racket   = hands (execute registered primitives)
 ;; Claims   = memory (record eval events and results)
-;;
-;; Evaluation is not a query. Evaluation is a controlled graph
-;; transition that uses queries to find where to step.
 
-;; --- Predicates (created fresh by setup-eval!) ---
+;; --- Predicate accessors (stored in context extensions) ---
 
-(define op-pred (make-parameter #f))
-(define left-pred (make-parameter #f))
-(define right-pred (make-parameter #f))
-(define evaluated-pred (make-parameter #f))
-(define result-pred (make-parameter #f))
-(define under-env-pred (make-parameter #f))
-
-;; --- Primitive registry ---
-
-(define primitives (make-parameter (make-hash)))
-
-(define (register-primitive! obj-id proc)
-  (hash-set! (primitives) obj-id proc))
+(define (op-pred) (ctx-ref 'op-pred))
+(define (left-pred) (ctx-ref 'left-pred))
+(define (right-pred) (ctx-ref 'right-pred))
+(define (evaluated-pred) (ctx-ref 'evaluated-pred))
+(define (result-pred) (ctx-ref 'result-pred))
+(define (under-env-pred) (ctx-ref 'under-env-pred))
 
 ;; --- Setup ---
 
 (define (setup-eval!)
-  (op-pred (named! "op"))
-  (left-pred (named! "left"))
-  (right-pred (named! "right"))
-  (evaluated-pred (named! "evaluated"))
-  (result-pred (named! "result"))
-  (under-env-pred (named! "under-env"))
-  (primitives (make-hash))
-  ;; An operand resolves to a value directly
+  (ctx-set! 'op-pred (named! "op"))
+  (ctx-set! 'left-pred (named! "left"))
+  (ctx-set! 'right-pred (named! "right"))
+  (ctx-set! 'evaluated-pred (named! "evaluated"))
+  (ctx-set! 'result-pred (named! "result"))
+  (ctx-set! 'under-env-pred (named! "under-env"))
+  (ctx-set! 'primitives (make-hash))
   (define-rule (operand-val (? operand) (? operand))
     (value (? operand) (? _lit)))
-  ;; An operand resolves via a prior eval event's result
   (define-rule (operand-val (? operand) (? result-val))
     (current-triple (? ev) (evaluated-pred) (? operand))
     (current-triple (? ev) (result-pred) (? result-val)))
-  ;; An expression is ready when it has op + both operands resolve
   (define-rule (ready (? expr) (? op) (? lval) (? rval))
     (current-triple (? expr) (op-pred) (? op))
     (current-triple (? expr) (left-pred) (? left))
@@ -61,6 +48,11 @@
     (operand-val (? left) (? lval))
     (operand-val (? right) (? rval)))
   (void))
+
+;; --- Primitive registry ---
+
+(define (register-primitive! obj-id proc)
+  (hash-set! (ctx-ref 'primitives) obj-id proc))
 
 ;; --- Expression builder ---
 
@@ -78,10 +70,11 @@
 
 (define (eval-step! env #:only [only #f])
   (define results (query (ready (? expr) (? op) (? lval) (? rval))))
+  (define prims (ctx-ref 'primitives))
   (define candidates
-    (filter (λ (s)
+    (filter (lambda (s)
               (define expr-id (hash-ref s 'expr))
-              (and (hash-ref (primitives) (hash-ref s 'op) #f)
+              (and (hash-ref prims (hash-ref s 'op) #f)
                    (not (has-eval-event? expr-id))
                    (or (not only) (member expr-id only))))
             results))
@@ -93,7 +86,7 @@
      (define op-id (hash-ref s 'op))
      (define lval-id (hash-ref s 'lval))
      (define rval-id (hash-ref s 'rval))
-     (define proc (hash-ref (primitives) op-id))
+     (define proc (hash-ref prims op-id))
      (define result-lit (proc (resolve-value lval-id)
                               (resolve-value rval-id)))
      (define result-val (value! result-lit))
