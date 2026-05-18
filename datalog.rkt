@@ -65,6 +65,10 @@
       (list (list-ref row 2)
             (list-ref row 1)
             (list-ref row 3))))
+  (hash-set! db 'value
+    (for/list ([id (all-objects)]
+               #:when (resolve-value id))
+      (list id (resolve-value id))))
   (hash-set! db 'object
     (for/list ([id (all-objects)])
       (list id)))

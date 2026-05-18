@@ -1,4 +1,4 @@
-# cnf-racket
+# claim-normal-form-racket
 
 Racket implementation of [Claim Normal Form](https://github.com/tompassarelli/claim-normal-form) — in-memory kernel + Datalog query engine.
 
@@ -73,9 +73,46 @@ Base relations:
 - `(triple L P R)` — convenience projection
 - `(object Id)` — all object IDs
 
+## Evaluator (`eval.rkt`)
+
+Small-step graph evaluator. Datalog finds redexes, Racket executes
+primitives, claims record eval events.
+
+```racket
+(require "cnf.rkt" "datalog.rkt" "eval.rkt")
+
+(setup-eval!)
+
+(define add-op (named! "add"))
+(register-primitive! add-op +)
+
+(define e (expr! add-op (value! 2) (value! 3)))
+(define env (entity!))
+(define evs (run! env))
+
+(eval-result (first evs))  ; => 5
+```
+
+Nested expressions work — inner results feed outer operands
+automatically via Datalog derivation:
+
+```racket
+(define inner (expr! add-op (value! 1) (value! 2)))
+(define outer (expr! mul-op inner (value! 4)))
+(run! env)  ; evaluates inner first, then outer => 12
+```
+
+Eval events are ordinary claims — queryable like anything else:
+
+```racket
+(query (triple (? ev) (evaluated-pred) (? expr)))
+(query (triple (? ev) (result-pred) (? val)))
+```
+
 ## Tests
 
 ```
 racket cnf-test.rkt      # 9 kernel tests
 racket datalog-test.rkt  # 9 datalog tests
+racket eval-test.rkt     # 6 evaluator tests
 ```
