@@ -1,5 +1,7 @@
 # claim-normal-form
 
+Software should not primarily live as text files. It should live as a claim graph where code, data, names, history, dependencies, runtime events, errors, patches, and explanations are all first-class addressable objects.
+
 A data-modeling normal form where everything is objects and claims.
 In-memory Racket kernel + Datalog query engine.
 
