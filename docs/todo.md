@@ -136,6 +136,19 @@ reduction). Schema in parse eliminates discovery. Batch combines rule
 definitions + query into 1 call. Projected E6 total: ~11 (CNF) vs 12
 (text). **CNF wins total for the first time.** See `docs/experiments/e7-interface-proof/`.
 
+## DONE: E8 New Interface Arena
+
+Real rematch with interface improvements active. CNF: 14 calls, ~127s.
+Text: 3 calls, ~78s. Both correct. Interface cut CNF from 32→14, but
+text agent also evolved (12→3) by front-loading all analysis into one
+Python script.
+
+Key insight: text wins when all questions are known upfront. CNF wins
+in the incremental-questions scenario — matview answers in 1 call vs
+re-analysis. The next test needs conditions that expose the real
+advantage: larger codebase, emergent questions, mutations.
+See `docs/experiments/e8-new-interface/`.
+
 ## NEXT: Real Codebase Demo
 
 Run the MCP server against a non-toy Racket project (50+ functions).

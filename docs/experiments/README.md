@@ -14,6 +14,7 @@ a maintained semantic index than against text files.
 | E5 | Real agent arena | [results](e5-arena/results.md) | Text wins single task (8 vs 42 calls). CNF builds persistent rules. |
 | E6 | Multi-round arena | [results](e6-multi-round/results.md) | Text wins total (12 vs 32). CNF wins tasks 2-5 (5 vs 7). |
 | E7 | Interface proof | [results](e7-interface-proof/results.md) | **42 calls → 7.** Schema + batch + symbols = 6x reduction. |
+| E8 | New interface arena | [results](e8-new-interface/results.md) | CNF 32→14 calls. Text also evolved: 12→3. Text wins 4.7x. |
 
 ## The arc
 
@@ -29,5 +30,9 @@ vs 7 (text). But task 1's schema discovery (13 of 27 calls) kept
 total high.
 
 E7 proved the interface fix works: same task, 7 calls instead of 42.
-Projected E6 with new interface: ~11 calls (CNF) vs 12 (text).
-**CNF wins total for the first time.**
+
+E8 ran the real rematch: CNF dropped from 32 to 14 calls, but the
+text agent also got smarter — from 12 to 3 calls by front-loading
+all analysis into one Python script. Text wins when all questions are
+known upfront. CNF wins in the incremental-questions scenario (1-2
+calls per new question vs re-analysis).
