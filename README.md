@@ -61,9 +61,15 @@ This is not an optimization. It is structurally impossible with text
 tools — there is no shared semantic substrate to persist, inherit, or
 compose on. E16 task 10 scores 10/10 for CNF and 0/10 for text.
 
-See also [E15](docs/experiments/e15-correctness/results.md) (5-task
-correctness eval) and the full
-[experiment arc](docs/experiments/README.md).
+[E17](docs/experiments/e17-agent-in-the-loop/results.md) goes further:
+both agents make actual code changes and run the test suite. **Both pass
+all 26 tests on every task.** The difference only appears in hidden
+tests checking API contracts: CNF 30/30 (100%), text 26/30 (87%). The
+text agent renames dict keys alongside function calls — CI passes, but
+downstream consumers break.
+
+See also [E15](docs/experiments/e15-correctness/results.md) and the
+full [experiment arc](docs/experiments/README.md).
 
 ## Architecture
 
@@ -128,7 +134,8 @@ and resume across sessions — without rebuilding context from text.
 ## Demos
 
 ```bash
-racket experiments/e16-agent-grounding/run-eval.rkt  # E16: 10-task agent grounding eval
+python3 experiments/e17-agent-in-the-loop/run-eval.py  # E17: agent-in-the-loop, hidden tests
+racket experiments/e16-agent-grounding/run-eval.rkt    # E16: 10-task agent grounding eval
 racket e15-eval.rkt      # E15: correctness eval — CNF vs grep on 5 tasks
 racket python-demo.rkt   # E14: Python bridge — parse, deps, rename, incremental edit
 racket beagle-demo.rkt   # E13: Beagle bridge — real typed Lisp, full workflow
@@ -146,8 +153,8 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 | **[Language bridges](docs/bridges.md)** | Beagle and Python bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 16 experiments (E1–E16) with raw results |
-| **[Devlog](docs/devlog/)** | 19 entries — discoveries, direction changes, honest numbers |
+| **[Experiments](docs/experiments/)** | 17 experiments (E1–E17) with raw results |
+| **[Devlog](docs/devlog/)** | 20 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests

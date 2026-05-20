@@ -23,6 +23,7 @@ a maintained semantic index than against text files.
 | E14 | Python bridge | [results](e14-python-bridge/results.md) | Second language. Subprocess parse, same engine. Language-agnostic MCP. |
 | E15 | Correctness eval | [results](e15-correctness/results.md) | **CNF correct on 5/5 tasks. Text search wrong on 5/5.** The payoff experiment. |
 | E16 | Agent grounding | [results](e16-agent-grounding/results.md) | **CNF correct on 7/7 structural tasks. Text search wrong on 5, unprovable on 2.** |
+| E17 | Agent-in-the-loop | [results](e17-agent-in-the-loop/results.md) | **CNF 30/30, text 26/30. Both pass all tests — difference is in API contracts.** |
 
 ## The arc
 
@@ -82,3 +83,11 @@ ground truth. CNF correct on 7/7 structural tasks, text search wrong
 on 5, unprovable on 2. Cross-session memory (task 10) scores 10/10
 for CNF and 0/10 for text — structurally impossible without a
 persistent semantic substrate.
+
+E17 closed the loop: both agents make actual code changes and run
+the test suite. Both pass all 26 tests on every task. The difference
+only appears in hidden tests checking API contracts: CNF 30/30 (100%),
+text 26/30 (87%). The text agent renames dict keys alongside function
+calls and misses dead code whose names appear as dict keys. CI can't
+catch this — the failure is in downstream contracts the tests don't
+cover.

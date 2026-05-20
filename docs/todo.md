@@ -425,22 +425,21 @@ Key results:
 See `experiments/e16-agent-grounding/` and
 `docs/experiments/e16-agent-grounding/results.md`.
 
-## NOW: E17 — Agent-in-the-Loop Evaluation
+## DONE: E17 — Agent-in-the-Loop Evaluation
 
-Same model. Same tasks. Same hidden tests. Different tool surfaces.
+Both agents make actual code changes, both run the test suite.
+4 tasks: rename subtotal, dead code removal, tax exemption, rename order_total.
 
-Condition A (text agent): read, search, edit, run tests.
-Condition B (CNF agent): MCP resources + CNF tools + edit/render/run tests.
+Results: both pass all 26 original tests on every task. Hidden tests
+(API contracts the test suite doesn't cover): CNF 30/30 (100%),
+text 26/30 (87%).
 
-Measure:
-- Correct task completion (hidden tests passed)
-- False-positive edits (did you rename a dict key?)
-- Missed affected sites
-- Tool calls, tokens, time
-- Whether explanation matches ground truth
+Failures: text renames dict keys alongside function calls (Task 01),
+misses dead code whose names appear as dict keys (Task 04). Tasks 05
+and 09 are ties — CNF doesn't win on local changes or unique names.
 
-This is the experiment that earns "CNF makes agents produce better code."
-E16 proved the substrate claim. E17 proves the agent claim.
+See `experiments/e17-agent-in-the-loop/` and
+`docs/experiments/e17-agent-in-the-loop/results.md`.
 
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
