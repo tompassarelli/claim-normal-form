@@ -195,18 +195,22 @@ one-off scripts are unvalidated. The matview is a tested artifact.
 Call count is the wrong metric. The question is what the agent CAN DO.
 Results: `docs/experiments/e10-shared-substrate/`.
 
-## NEXT: Transactions (Datomic-inspired)
+## DONE: Transactions (Datomic-inspired)
 
-Checkpoint is coarse (whole-graph snapshot). Transactions add:
-1. **Tx entities** — every claim gets a tx ID. "What claims did Agent 1
-   assert?" and "what changed since I was last here?" become queryable.
-2. **Temporal queries** — "as-of tx 12, what were the transitive deps?"
-   The claim graph becomes a timeline, not just a snapshot.
-3. **Batch atomicity** — a rename touching 7 call sites either all
-   succeeds or rolls back. Currently each claim! fires hooks independently.
+Every claim now belongs to a transaction. Transactions add:
+1. **Tx entities** — every `claim!` creates or joins a tx. Implicit
+   (one per claim) or explicit (`begin-tx!`/`commit-tx!`). Queryable
+   via `claim-tx`, `tx-claims`, `claims-since`, `all-txs`.
+2. **Temporal queries** — `claims-visible-as-of` filters to claims
+   that existed at tx seq N, respecting supersession as of that point.
+   Datalog EDB: `as-of-triple`, `as-of-claim`, `tx-info`, `tx-claims-rel`.
+3. **Batch atomicity** — `call-with-transaction` wraps multiple
+   operations; hooks deferred to commit, full rollback on error via
+   snapshot/restore of all mutable state. MCP `batch` gets `atomic` flag.
 
-Enables diff-based reasoning: agents ask "what changed?" not just
-"what is?" This is the next evolution after checkpoint/restore.
+26 MCP tools (was 24: added `tx_log`, `current_tx_seq`). Serialization
+format v2 preserves tx data; v1 imports get a synthetic tx. 72 tests
+(13 new tx tests).
 
 ## NEXT: Multi-Agent Concurrent Access
 

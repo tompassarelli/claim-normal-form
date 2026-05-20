@@ -438,6 +438,8 @@
       "Execute multiple operations in a single call. "
       "Each operation has a 'tool' name and 'arguments' object. "
       "Operations execute sequentially; all results are returned. "
+      "With atomic: true, all operations share one transaction — "
+      "if any fails, all are rolled back. "
       "Example: [{\"tool\": \"define_rule\", \"arguments\": {\"head\": \"...\", \"body\": \"...\"}}, "
       "{\"tool\": \"query\", \"arguments\": {\"body\": \"...\"}}]")
     'inputSchema (hasheq
@@ -451,7 +453,9 @@
               'tool (hasheq 'type "string" 'description "Tool name")
               'arguments (hasheq 'type "object" 'description "Tool arguments"))
             'required '("tool"))
-          'description "Array of operations to execute"))
+          'description "Array of operations to execute")
+        'atomic (hasheq 'type "boolean"
+                        'description "If true, wrap all operations in a transaction (all-or-nothing)"))
       'required '("operations")))
 
    (hasheq
@@ -476,7 +480,28 @@
       'type "object"
       'properties (hasheq
         'path (hasheq 'type "string"
-                      'description "File path (default: ~/.cnf/checkpoint.json)"))))))
+                      'description "File path (default: ~/.cnf/checkpoint.json)"))))
+
+   ;; Transactions
+   (hasheq
+    'name "tx_log"
+    'description (string-append
+      "List recent transactions. Each transaction groups claims asserted together. "
+      "Use since_seq to see only new transactions since a known point.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'since_seq (hasheq 'type "integer"
+                           'description "Only show transactions after this sequence number (default: 0)")
+        'limit (hasheq 'type "integer"
+                       'description "Maximum transactions to return (default: 20)"))))
+
+   (hasheq
+    'name "current_tx_seq"
+    'description (string-append
+      "Return the latest transaction sequence number. Save this value, then later call "
+      "tx_log with since_seq to see what changed since you last checked.")
+    'inputSchema (hasheq 'type "object" 'properties (hasheq)))))
 
 ;; --- Tool handlers ---
 
@@ -722,11 +747,15 @@
      (define cls (length (claims-where)))
      (define rules (length (ctx-ref 'rules '())))
      (define rule-ents (length (list-rule-entities)))
-     (format "Objects: ~a\nClaims: ~a\nRules: ~a (~a as claims)" objs cls rules rule-ents)]
+     (define tx-count (length (all-txs)))
+     (define latest-seq (current-tx-seq))
+     (format "Objects: ~a\nClaims: ~a\nRules: ~a (~a as claims)\nTransactions: ~a (latest seq: ~a)"
+             objs cls rules rule-ents tx-count latest-seq)]
 
     [("batch")
      (define ops (hash-ref arguments 'operations))
-     (define results
+     (define atomic? (hash-ref arguments 'atomic #f))
+     (define (execute-batch)
        (for/list ([op (in-list ops)]
                   [i (in-naturals 1)])
          (define tool-name (hash-ref op 'tool))
@@ -735,9 +764,15 @@
            (with-handlers ([exn:fail? (lambda (e)
                              (values (exn-message e) #t))])
              (values (handle-tool tool-name tool-args) #f)))
+         (when (and is-error atomic?)
+           (error 'batch "operation ~a (~a) failed: ~a" i tool-name result))
          (if is-error
              (format "[~a] ~a ERROR: ~a" i tool-name result)
              (format "[~a] ~a:\n~a" i tool-name result))))
+     (define results
+       (if atomic?
+           (call-with-transaction (lambda () (execute-batch)))
+           (execute-batch)))
      (string-join results "\n\n")]
 
     [("checkpoint")
@@ -759,9 +794,35 @@
      (restore-workspace! data)
      (define rule-count (length (ctx-ref 'rules '())))
      (define user-rules (length (list-rule-entities)))
-     (format "Restored from ~a (~a objects, ~a claims, ~a rules [~a builtin, ~a user])"
+     (define tx-count (length (all-txs)))
+     (define latest-seq (current-tx-seq))
+     (format "Restored from ~a (~a objects, ~a claims, ~a rules [~a builtin, ~a user], ~a txs [latest seq ~a])"
              path (length (all-objects)) (length (claims-where))
-             rule-count (- rule-count user-rules) user-rules)]
+             rule-count (- rule-count user-rules) user-rules
+             tx-count latest-seq)]
+
+    [("tx_log")
+     (define since (hash-ref arguments 'since_seq 0))
+     (define limit (hash-ref arguments 'limit 20))
+     (define txs (all-txs))
+     (define filtered (filter (lambda (tx) (> (tx-seq tx) since)) txs))
+     (define limited (if (<= (length filtered) limit)
+                         filtered
+                         (take filtered limit)))
+     (if (null? limited)
+         "No transactions."
+         (string-join
+          (cons (format "~a transaction(s)~a:"
+                        (length limited)
+                        (if (> since 0) (format " (since seq ~a)" since) ""))
+                (for/list ([tx (in-list limited)])
+                  (define seq (tx-seq tx))
+                  (define cids (tx-claims tx))
+                  (format "  tx ~a (seq ~a): ~a claim(s)" tx seq (length cids))))
+          "\n"))]
+
+    [("current_tx_seq")
+     (format "~a" (current-tx-seq))]
 
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))

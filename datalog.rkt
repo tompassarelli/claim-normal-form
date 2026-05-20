@@ -115,7 +115,8 @@
 
 ;; --- Relation classification ---
 
-(define edb-relations '(claim triple current-claim current-triple value object))
+(define edb-relations '(claim triple current-claim current-triple value object
+                        as-of-triple as-of-claim tx-info tx-claims-rel))
 
 (define (edb-rel? rel)
   (memq rel edb-relations))
@@ -215,6 +216,69 @@
       (lambda (t) (match-tuple args t subst))
       (for/list ([id (all-objects)]) (list id)))]))
 
+;; --- Temporal EDB evaluation ---
+
+(define (eval-as-of-triple args resolved subst)
+  (define tx-seq-val (list-ref resolved 0))
+  (unless (bound? tx-seq-val)
+    (error 'as-of-triple "TxSeq (first arg) must be bound"))
+  (define l (and (bound? (list-ref resolved 1)) (list-ref resolved 1)))
+  (define p (and (bound? (list-ref resolved 2)) (list-ref resolved 2)))
+  (define r (and (bound? (list-ref resolved 3)) (list-ref resolved 3)))
+  (define rows (claims-visible-as-of tx-seq-val #:l l #:p p #:r r))
+  (filter-map
+   (lambda (c)
+     (define tuple (list tx-seq-val (list-ref c 2) (list-ref c 1) (list-ref c 3)))
+     (match-tuple args tuple subst))
+   rows))
+
+(define (eval-as-of-claim args resolved subst)
+  (define tx-seq-val (list-ref resolved 0))
+  (unless (bound? tx-seq-val)
+    (error 'as-of-claim "TxSeq (first arg) must be bound"))
+  (define l (and (bound? (list-ref resolved 2)) (list-ref resolved 2)))
+  (define p (and (bound? (list-ref resolved 3)) (list-ref resolved 3)))
+  (define r (and (bound? (list-ref resolved 4)) (list-ref resolved 4)))
+  (define rows (claims-visible-as-of tx-seq-val #:l l #:p p #:r r))
+  (filter-map
+   (lambda (c)
+     (define tuple (list tx-seq-val (list-ref c 0) (list-ref c 2) (list-ref c 1) (list-ref c 3)))
+     (match-tuple args tuple subst))
+   rows))
+
+(define (eval-tx-info args resolved subst)
+  (define tx-val (list-ref resolved 0))
+  (define meta-h (ctx-ref 'tx-meta #f))
+  (if (not meta-h) '()
+      (cond
+        [(bound? tx-val)
+         (define meta (hash-ref meta-h tx-val #f))
+         (if meta
+             (filter-map (lambda (t) (match-tuple args t subst))
+                         (list (list tx-val (hash-ref meta 'seq))))
+             '())]
+        [else
+         (filter-map
+          (lambda (entry)
+            (match-tuple args (list (car entry) (hash-ref (cdr entry) 'seq)) subst))
+          (hash->list meta-h))])))
+
+(define (eval-tx-claims-rel args resolved subst)
+  (define tx-val (list-ref resolved 0))
+  (define t2c (ctx-ref 'tx-to-claims #f))
+  (if (not t2c) '()
+      (cond
+        [(bound? tx-val)
+         (filter-map
+          (lambda (cid) (match-tuple args (list tx-val cid) subst))
+          (hash-ref t2c tx-val '()))]
+        [else
+         (for*/list ([(tx cids) (in-hash t2c)]
+                     [cid (in-list cids)]
+                     [result (in-value (match-tuple args (list tx cid) subst))]
+                     #:when result)
+           result)])))
+
 (define (match-atom-edb a subst)
   (define args (atom-args a))
   (define resolved (map (lambda (x) (resolve-arg x subst)) args))
@@ -224,7 +288,11 @@
     [(current-claim)  (eval-claim-base args resolved subst #t)]
     [(claim)          (eval-claim-base args resolved subst #f)]
     [(value)          (eval-value-base args resolved subst)]
-    [(object)         (eval-object-base args resolved subst)]))
+    [(object)         (eval-object-base args resolved subst)]
+    [(as-of-triple)   (eval-as-of-triple args resolved subst)]
+    [(as-of-claim)    (eval-as-of-claim args resolved subst)]
+    [(tx-info)        (eval-tx-info args resolved subst)]
+    [(tx-claims-rel)  (eval-tx-claims-rel args resolved subst)]))
 
 ;; --- Set-based IDB storage ---
 
@@ -429,7 +497,12 @@
     [(current-claim) (eval-claim-base/prov args resolved subst #t)]
     [(claim)         (eval-claim-base/prov args resolved subst #f)]
     [(value)  (map (lambda (s) (cons s (set))) (eval-value-base args resolved subst))]
-    [(object) (map (lambda (s) (cons s (set))) (eval-object-base args resolved subst))]))
+    [(object) (map (lambda (s) (cons s (set))) (eval-object-base args resolved subst))]
+    ;; Temporal relations — empty provenance (point-in-time snapshots)
+    [(as-of-triple)   (map (lambda (s) (cons s (set))) (eval-as-of-triple args resolved subst))]
+    [(as-of-claim)    (map (lambda (s) (cons s (set))) (eval-as-of-claim args resolved subst))]
+    [(tx-info)        (map (lambda (s) (cons s (set))) (eval-tx-info args resolved subst))]
+    [(tx-claims-rel)  (map (lambda (s) (cons s (set))) (eval-tx-claims-rel args resolved subst))]))
 
 (define (eval-body/prov db prov-map atoms subst claims get-idb)
   (cond

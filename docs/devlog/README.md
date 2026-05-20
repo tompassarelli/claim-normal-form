@@ -16,3 +16,5 @@ Each entry is a snapshot of understanding at the time it was written.
 | 007 | 2026-05-20 | [Incremental rule supersession](007-incremental-supersession.md) |
 | 008 | 2026-05-20 | [Interface redesign: the bottleneck shifted](008-interface-redesign.md) |
 | 009 | 2026-05-20 | [What the arenas actually proved (and didn't)](009-what-the-arenas-actually-proved.md) |
+| 010 | 2026-05-20 | [The shared substrate: persistence changes the game](010-shared-substrate.md) |
+| 011 | 2026-05-20 | [Datomic-inspired transactions](011-transactions.md) |
