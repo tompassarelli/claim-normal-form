@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt")
+(require cnf)
 
 ;; Benchmark: indexed affected-only recompute
 ;;

@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "lang.rkt")
+(require cnf cnf/lang)
 
 ;; Code as Claim Graph, Text as Projection
 ;;

@@ -7,13 +7,13 @@
 
 (require json
          racket/tcp
-         "cnf.rkt"
-         "datalog.rkt"
-         "eval.rkt"
-         "graph.rkt"
-         "schema.rkt"
-         "beagle-lang.rkt"
-         "python-lang.rkt")
+         "private/kernel.rkt"
+         "private/datalog.rkt"
+         "private/eval.rkt"
+         "private/graph.rkt"
+         "private/schema.rkt"
+         "private/beagle.rkt"
+         "private/python.rkt")
 
 ;; --- Transport ---
 
@@ -686,7 +686,7 @@
     [else (format "Unknown resource: ~a" uri)]))
 
 (define (ctx-ref* key)
-  (hash-ref (cnf-ctx-ext (current-ctx)) key #f))
+  (ctx-ref key))
 
 ;; --- Tool handlers ---
 

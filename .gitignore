@@ -1,1 +1,3 @@
-experiments/e16-agent-grounding/codebase/__pycache__/
+compiled/
+**/compiled/
+__pycache__/

@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt")
+(require "kernel.rkt" "datalog.rkt")
 
 (provide setup-schema!
          define-predicates

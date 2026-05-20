@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "python-lang.rkt")
+(require cnf cnf/python)
 
 (define python-source #<<PYTHON
 from typing import List, Dict, Optional

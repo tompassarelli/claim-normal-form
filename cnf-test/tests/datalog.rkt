@@ -1,8 +1,8 @@
 #lang racket
 
 (require rackunit
-         "cnf.rkt"
-         "datalog.rkt")
+         cnf/private/kernel
+         cnf/private/datalog)
 
 ;; 1. Basic triple query
 (reset-store!)

@@ -65,21 +65,35 @@ experiments, E1–E17).
 ## Architecture
 
 ```
-cnf.rkt            Entity/Value/Claim kernel — objects, claims, indexed lookups
-datalog.rkt        Semi-naive Datalog — derived facts, materialized views, delta propagation
-eval.rkt           Graph evaluator — Datalog finds redexes, claims record results
-graph.rkt          Names, supersession, rename, dependency tracking
-schema.rkt         Ergonomic CRUD — entity/claims, lookup, find-by, update
-lang.rkt           Toy language bridge — parse/render/rename round-trip
-beagle-lang.rkt    Beagle bridge — real typed Lisp, 30+ form types, 18 predicates
-python-lang.rkt    Python bridge — AST via subprocess, 30+ node types, 14 predicates
-mcp-server.rkt     30 MCP tools over JSON-RPC 2.0 — the agent control surface
+cnf-lib/
+  main.rkt             Public API — (require cnf) re-exports core modules
+  server.rkt           30 MCP tools over JSON-RPC 2.0 — the agent control surface
+  lang.rkt             Toy language bridge — (require cnf/lang)
+  racket.rkt           Racket bridge (minimal) — (require cnf/racket)
+  python.rkt           Python bridge — (require cnf/python)
+  beagle.rkt           Beagle bridge — (require cnf/beagle)
+  private/
+    kernel.rkt         Entity/Value/Claim kernel — objects, claims, indexed lookups
+    datalog.rkt        Semi-naive Datalog — derived facts, materialized views, delta propagation
+    eval.rkt           Graph evaluator — Datalog finds redexes, claims record results
+    graph.rkt          Names, supersession, rename, dependency tracking
+    schema.rkt         Ergonomic CRUD — entity/claims, lookup, find-by, update
+    lang.rkt           Toy language — parse/render/rename round-trip
+    racket.rkt         Racket bridge — define, struct, let, lambda, cond (no macros)
+    python.rkt         Python bridge — AST via subprocess, 30+ node types, 14 predicates
+    beagle.rkt         Beagle bridge — real typed Lisp, 30+ form types, 18 predicates
+cnf-test/
+  tests/               11 test files, 379 tests
+cnf/
+  info.rkt             Meta package — (define implies '("cnf-lib"))
 ```
 
-Two language bridges prove the pattern is language-agnostic. Adding a
-new language means writing a frontend that maps its AST into entities
-and claims. Dependency queries, rename propagation, history, MCP tools,
-and materialized views are shared infrastructure.
+Three language bridges prove the pattern is language-agnostic. The
+Racket bridge is minimal (define, struct, let, lambda, cond — no macro
+expansion). Adding a new language means writing a frontend that maps
+its AST into entities and claims. Dependency queries, rename
+propagation, history, MCP tools, and materialized views are shared
+infrastructure.
 
 ## The ontology
 
@@ -100,9 +114,24 @@ the subject of later claims. Reification is the default, not a bolt-on.
 
 ```bash
 # Prerequisites: Racket 8.x, Python 3.x (for Python bridge)
-racket mcp-server.rkt           # stdio mode
-racket mcp-server.rkt --daemon 7888   # daemon mode (multi-client, MVCC)
-racket mcp-server.rkt --connect 7888  # bridge to running daemon
+
+# Install
+git clone https://github.com/tom/cnf-racket && cd cnf-racket
+raco pkg install cnf/            # meta package — installs cnf-lib + deps
+
+# Beagle bridge requires beagle-lib (optional):
+#   git clone https://github.com/tom/beagle && raco pkg install beagle/beagle-lib/
+
+# Verify
+raco test cnf-test/tests/
+
+# Use as a library
+racket -e '(require cnf) (displayln (make-cnf-ctx))'
+
+# MCP server
+racket cnf-lib/server.rkt               # stdio mode
+racket cnf-lib/server.rkt --daemon 7888 # daemon mode (multi-client, MVCC)
+racket cnf-lib/server.rkt --connect 7888 # bridge to running daemon
 ```
 
 Claude Code MCP configuration (`.claude/settings.json`):
@@ -112,7 +141,7 @@ Claude Code MCP configuration (`.claude/settings.json`):
   "mcpServers": {
     "cnf": {
       "command": "racket",
-      "args": ["/path/to/cnf-racket/mcp-server.rkt"]
+      "args": ["/path/to/cnf-racket/cnf-lib/server.rkt"]
     }
   }
 }
@@ -141,7 +170,7 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 | **[How CNF works](docs/overview.md)** | Concrete walkthrough — function as claims, rename, deps, agents |
 | **[API reference](docs/api.md)** | Kernel, Datalog, eval, schema, graph, lang layer APIs |
 | **[MCP server](docs/mcp.md)** | 30 tools, MCP Resources, workflows, daemon mode |
-| **[Language bridges](docs/bridges.md)** | Beagle and Python bridges, adding new languages |
+| **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
 | **[Experiments](docs/experiments/)** | 17 experiments (E1–E17) with raw results |
@@ -150,19 +179,10 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 
 ## Tests
 
-118 tests across 10 files:
+379 tests across 11 files:
 
 ```bash
-racket cnf-test.rkt           # 11 kernel
-racket datalog-test.rkt       # 16 datalog (incl. incremental rule add/supersede)
-racket eval-test.rkt          # 6 evaluator
-racket demo-test.rkt          # 8 graph layer
-racket schema-test.rkt        # 10 schema
-racket lang-test.rkt          # 15 lang (incl. incremental parse)
-racket tx-test.rkt            # 16 transactions (incl. agent identity)
-racket rwlock-test.rkt        # 6 MVCC snapshot isolation
-racket beagle-lang-test.rkt   # 15 beagle bridge
-racket python-lang-test.rkt   # 15 python bridge
+raco test cnf-test/tests/     # run all
 ```
 
 ## Honest limitations

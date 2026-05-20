@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "python-lang.rkt")
+(require cnf cnf/python)
 
 ;; E15: Correctness evaluation — CNF vs grep on structural questions.
 ;;

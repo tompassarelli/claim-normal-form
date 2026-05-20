@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "graph.rkt" json)
+(require "kernel.rkt" "datalog.rkt" "graph.rkt" json)
 
 (provide setup-python-lang!
          parse-python-program! parse-python-file!

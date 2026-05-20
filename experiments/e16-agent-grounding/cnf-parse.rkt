@@ -1,10 +1,11 @@
 #lang racket
 
-(require "../../cnf.rkt" "../../datalog.rkt" "../../eval.rkt"
-         "../../graph.rkt" "../../python-lang.rkt")
+(require cnf cnf/python)
 
 ;; Parse the E16 codebase into the CNF claim graph and demonstrate
 ;; structural queries that the agent would use during tasks.
+
+(define here (path-only (syntax-source #'here)))
 
 (printf "=== E16 CNF Baseline ===\n\n")
 
@@ -18,7 +19,7 @@
 (define all-fns '())
 
 (for ([mod (in-list modules)])
-  (define path (build-path "codebase" mod))
+  (define path (build-path here "codebase" mod))
   (define source (file->string path))
   (define t0 (current-inexact-milliseconds))
   (define fns (parse-python-program! source))

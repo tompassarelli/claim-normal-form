@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt")
+(require "kernel.rkt")
 
 (provide var atom dl-rule
          ?

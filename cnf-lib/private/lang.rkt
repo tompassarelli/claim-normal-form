@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt")
+(require "kernel.rkt" "datalog.rkt" "eval.rkt" "graph.rkt")
 
 (provide setup-lang!
          parse-program!

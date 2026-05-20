@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "beagle-lang.rkt")
+(require cnf cnf/beagle)
 
 ;; E13: Beagle bridge demo — real beagle syntax, real CNF claim graph.
 ;;

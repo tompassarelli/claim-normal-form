@@ -6,8 +6,7 @@
 ;; Full workflow: parse, discover, define rules, refactor, evolve.
 ;; Includes incremental parse (add/remove/modify) — the E9 missing piece.
 
-(require "../cnf.rkt" "../datalog.rkt" "../eval.rkt" "../graph.rkt"
-         "../schema.rkt" "../lang.rkt")
+(require cnf cnf/lang)
 
 (define (fresh!)
   (reset-store!)

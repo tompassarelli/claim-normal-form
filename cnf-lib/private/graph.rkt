@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt")
+(require "kernel.rkt" "datalog.rkt" "eval.rkt")
 
 (provide setup-graph!
          name-pred supersedes-pred

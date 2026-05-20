@@ -1,9 +1,10 @@
 #lang racket
 
-(require "../../cnf.rkt" "../../datalog.rkt" "../../eval.rkt"
-         "../../graph.rkt" "../../python-lang.rkt")
+(require cnf cnf/python)
 
 ;; E16 automated evaluation: CNF answers vs ground truth
+
+(define here (path-only (syntax-source #'here)))
 
 (printf "=== E16: Agent Grounding Evaluation — CNF Side ===\n\n")
 
@@ -15,7 +16,7 @@
 ;; Parse all modules
 (define all-fns '())
 (for ([mod '("pricing.py" "validation.py" "processing.py" "reporting.py")])
-  (define fns (parse-python-program! (file->string (build-path "codebase" mod))))
+  (define fns (parse-python-program! (file->string (build-path here "codebase" mod))))
   (set! all-fns (append all-fns fns)))
 (printf "Parsed ~a forms, ~a objects, ~a claims\n\n"
         (length all-fns) (length (all-objects)) (length (current-claims-where)))

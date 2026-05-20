@@ -1,9 +1,9 @@
 #lang racket
 
 (require rackunit
-         "cnf.rkt"
-         "datalog.rkt"
-         "eval.rkt")
+         cnf/private/kernel
+         cnf/private/datalog
+         cnf/private/eval)
 
 ;; 1. Add: 2 + 3 = 5
 (reset-store!)

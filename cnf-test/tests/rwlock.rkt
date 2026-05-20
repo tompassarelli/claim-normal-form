@@ -1,12 +1,12 @@
 #lang racket
 
 (require rackunit
-         "cnf.rkt"
-         "datalog.rkt"
-         "eval.rkt"
-         "graph.rkt"
-         "schema.rkt"
-         "lang.rkt")
+         cnf/private/kernel
+         cnf/private/datalog
+         cnf/private/eval
+         cnf/private/graph
+         cnf/private/schema
+         cnf/private/lang)
 
 ;; --- MVCC Tests ---
 ;; Tests for snapshot isolation: readers see consistent state,

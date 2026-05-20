@@ -1,6 +1,10 @@
 #lang racket
 
-(require rackunit cnf)
+(require rackunit
+         cnf/private/kernel
+         cnf/private/datalog
+         cnf/private/eval
+         cnf/private/graph)
 
 ;; 1. Semantic rename — rendered output changes, object references don't
 (reset-store!)

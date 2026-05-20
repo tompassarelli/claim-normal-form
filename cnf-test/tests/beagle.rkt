@@ -1,12 +1,12 @@
 #lang racket
 
 (require rackunit
-         "cnf.rkt"
-         "datalog.rkt"
-         "eval.rkt"
-         "graph.rkt"
-         "schema.rkt"
-         "beagle-lang.rkt")
+         cnf/private/kernel
+         cnf/private/datalog
+         cnf/private/eval
+         cnf/private/graph
+         cnf/private/schema
+         cnf/private/beagle)
 
 (define (fresh!)
   (reset-store!)

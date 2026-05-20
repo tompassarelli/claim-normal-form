@@ -1,9 +1,9 @@
 #lang racket
 
 (require rackunit
-         "cnf.rkt"
-         "datalog.rkt"
-         "schema.rkt")
+         cnf/private/kernel
+         cnf/private/datalog
+         cnf/private/schema)
 
 ;; 1. Implicit tx on every claim
 (reset-store!)

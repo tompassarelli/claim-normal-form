@@ -1,6 +1,6 @@
 #lang racket
 
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "lang.rkt")
+(require cnf cnf/lang)
 
 ;; Engine benchmark: CNF graph operations vs text-based equivalents.
 ;;

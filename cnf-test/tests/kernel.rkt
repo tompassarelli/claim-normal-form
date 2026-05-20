@@ -1,7 +1,7 @@
 #lang racket
 
 (require rackunit
-         "cnf.rkt")
+         cnf/private/kernel)
 
 ;; 1. Entities get unique opaque IDs
 (reset-store!)

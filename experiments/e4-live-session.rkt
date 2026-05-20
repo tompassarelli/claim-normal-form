@@ -1,8 +1,6 @@
 #lang racket
 
-(require rackunit
-         "../cnf.rkt" "../datalog.rkt" "../eval.rkt" "../graph.rkt"
-         "../schema.rkt" "../lang.rkt")
+(require rackunit cnf cnf/lang)
 
 ;; E4: Live Agent Session Comparison
 ;;
