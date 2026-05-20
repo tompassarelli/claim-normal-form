@@ -2,52 +2,50 @@
 
 A semantic working copy for coding agents.
 
-Text search can find strings. CNF can answer what the program means.
-
 Instead of treating source code as text, CNF treats it as claims about
 stable identities. A function is not the string `"add"`. It is an
 entity with a current name claim. A call site points at the function
 entity, not at matching characters. Renaming `add` to `sum_two` is one
 new claim, not a repository-wide string edit.
 
-Functions, names, parameters, calls, dependencies, history, and agent
-actions are all addressable objects in one graph. Text becomes a
-projection of the graph, not the source of truth.
-
 **[How CNF works](docs/overview.md)** — a concrete walkthrough of how
 a function becomes claims, why rename is O(1), and what this means for
-agents. Start here.
+agents.
 
-## Text search is not program understanding
+## The tests passed. The edit was wrong.
 
-AI coding agents answer structural questions by searching text: what
-calls this function, what breaks if it changes, what should be renamed,
-what is dead code, what did a previous agent already learn?
+[E17](docs/experiments/e17-agent-in-the-loop/results.md) compares two
+agents making code changes on the same 45-function Python codebase.
 
-[E16](docs/experiments/e16-agent-grounding/results.md) tests those
-questions on a 45-function Python codebase with ground truth.
+Both agents passed the visible 26-test suite on every task. But hidden
+API-contract tests exposed the difference:
 
-**CNF answered 7/7 structural tasks correctly.** Text search was wrong
-on 5 and unable to prove correctness on 2.
+| Agent workspace | Visible tests | Hidden contract tests |
+|---|---:|---:|
+| CNF-backed agent | 26/26 on every task | **30/30 (100%)** |
+| Text-backed agent | 26/26 on every task | **26/30 (87%)** |
 
-| Task | CNF | Text search |
-|------|-----|-------------|
-| Rename `subtotal` (call sites only) | **1 site, 0 false positives** | 30 matches, 8+ false positives |
-| Blast radius of `round_cents` | **23 affected** | misses 11 (48%) |
-| Disambiguate shadowed names | **per-entity resolution** | conflates all |
-| Dead code detection | **7 definitive** | 3 of 7 unprovable |
-| Full dep tree of `full_report` | **25 functions** | misses 20 (80%) |
-| Rename `order_total` (not `total()`) | **3 sites, 0 false positives** | 10 matches, 4+ false positives |
-| Cross-session memory | **10/10** | 0/10 (structurally impossible) |
+The failures were structural: the text-backed agent renamed dictionary
+keys along with function calls, and missed dead code whose names
+appeared in data keys. CI stayed green because the visible tests did
+not cover downstream API contracts. CNF avoided those errors because
+references point to stable entities, not matching strings.
 
-The result is not that CNF is faster than grep. The result is that text
-search does not represent identity. On transitive-impact tasks, text
-search missed 48–80% of affected functions and produced false positives
-on every rename.
+On local code changes, both approaches tied. CNF is not magic sauce for
+all programming. It wins specifically on structural tasks: rename
+safety, dead code removal, dependency-aware edits, and API-contract
+preservation.
 
-Tasks 05–07 (local code changes) are doable by both — CNF is not magic
-sauce for all programming. CNF wins where stable identity, dependency
-closure, and cross-session structure matter.
+### The proof stack
+
+- [E15](docs/experiments/e15-correctness/results.md): CNF answers
+  structural queries correctly; text search does not.
+- [E16](docs/experiments/e16-agent-grounding/results.md): CNF handles
+  structural tasks correctly (7/7); text search is wrong or unprovable
+  (7/7).
+- [E17](docs/experiments/e17-agent-in-the-loop/results.md): CNF-backed
+  agents make more correct structural edits; text-backed agents pass CI
+  while breaking hidden contracts.
 
 ### Cross-session memory
 
@@ -57,19 +55,12 @@ are all claims in the graph. A second agent restores the first agent's
 semantic work instead of rebuilding context from files. Rename
 propagates through the restored graph automatically.
 
-This is not an optimization. It is structurally impossible with text
-tools — there is no shared semantic substrate to persist, inherit, or
-compose on. E16 task 10 scores 10/10 for CNF and 0/10 for text.
+This is structurally impossible with text tools — there is no shared
+semantic substrate to persist, inherit, or compose on. E16 task 10
+scores 10/10 for CNF and 0/10 for text.
 
-[E17](docs/experiments/e17-agent-in-the-loop/results.md) goes further:
-both agents make actual code changes and run the test suite. **Both pass
-all 26 tests on every task.** The difference only appears in hidden
-tests checking API contracts: CNF 30/30 (100%), text 26/30 (87%). The
-text agent renames dict keys alongside function calls — CI passes, but
-downstream consumers break.
-
-See also [E15](docs/experiments/e15-correctness/results.md) and the
-full [experiment arc](docs/experiments/README.md).
+See the full [experiment arc](docs/experiments/README.md) (17
+experiments, E1–E17).
 
 ## Architecture
 
