@@ -22,7 +22,7 @@ a maintained semantic index than against text files.
 | E13 | Beagle bridge | [results](e13-beagle-bridge/results.md) | Real language (30+ form types). Parse→deps→rename→edit works end-to-end. |
 | E14 | Python bridge | [results](e14-python-bridge/results.md) | Second language. Subprocess parse, same engine. Language-agnostic MCP. |
 | E15 | Correctness eval | [results](e15-correctness/results.md) | **CNF correct on 5/5 tasks. Text search wrong on 5/5.** The payoff experiment. |
-| E16 | Agent grounding | [results](e16-agent-grounding/results.md) | 10 tasks, same model, hidden tests. Harness ready, runs pending. |
+| E16 | Agent grounding | [results](e16-agent-grounding/results.md) | **CNF correct on 7/7 structural tasks. Text search wrong on 5, unprovable on 2.** |
 
 ## The arc
 
@@ -71,3 +71,14 @@ E14 added the second language (Python) and proved the pattern is
 language-agnostic. The claim graph engine is the same — only the
 parser changes. MCP Resources shift the bottleneck from tool-call
 round-trips to context injection.
+
+E15 shifted the frame from speed to correctness: 5 structural tasks
+where CNF gets right answers and text search gets wrong answers.
+Entity resolution, transitive closure, and shadowed-name disambiguation
+are qualitatively different from string matching — not faster, correct.
+
+E16 scaled this to 10 tasks on a 45-function codebase with hidden
+ground truth. CNF correct on 7/7 structural tasks, text search wrong
+on 5, unprovable on 2. Cross-session memory (task 10) scores 10/10
+for CNF and 0/10 for text — structurally impossible without a
+persistent semantic substrate.

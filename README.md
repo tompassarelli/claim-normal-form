@@ -29,23 +29,27 @@ AI coding agents often answer structural questions by searching text:
 what calls this function, what breaks if it changes, what should be
 renamed, what is dead code?
 
-[E15](docs/experiments/e15-correctness/results.md) tests that failure
-mode on a 50-function Python codebase with ground-truth answers:
+[E16](docs/experiments/e16-agent-grounding/results.md) tests 10
+structural tasks on a 45-function Python codebase with ground truth:
 
 | Task | CNF | Text search |
 |------|-----|-------------|
-| "What's affected if `round_cents` changes?" | **17 functions** | 9 — misses 47% |
-| "Rename `subtotal` — what call sites change?" | **6 exact sites** | false positives from dict keys/strings |
-| "Which `process` is being called?" | **resolved by entity** | conflates shadowed/similar names |
-| "Which functions are dead code?" | **7 definitive** | unreliable — strings/comments match as "calls" |
-| "Full dependency tree of `full_report`?" | **21 functions** | 7 — misses 67% |
+| Rename `subtotal` (call sites only) | **1 site, 0 false positives** | 30 matches, 8+ false positives |
+| Blast radius of `round_cents` | **23 affected** | misses 11 (48%) |
+| Disambiguate shadowed names | **per-entity resolution** | conflates all |
+| Dead code detection | **7 definitive** | 3 of 7 unprovable |
+| Full dep tree of `full_report` | **25 functions** | misses 20 (80%) |
+| Rename `order_total` (not `total()`) | **3 sites, 0 false positives** | 10 matches, 4+ false positives |
+| Cross-session memory | **10/10** | 0/10 (structurally impossible) |
 
-The point is not speed. The point is correctness. Text search does not
-know what an identifier refers to. CNF does, because references point to
-stable entities, not matching strings. After parse and materialization,
-these answers come from cached derived views.
+CNF correct on 7/7 structural tasks. Text search wrong on 5, unprovable
+on 2. Tasks 05–07 (local code changes) are doable by both — structural
+analysis is where entity-based reasoning provides answers that text
+search fundamentally cannot.
 
-Run `racket e15-eval.rkt` to reproduce.
+See also [E15](docs/experiments/e15-correctness/results.md) (5-task
+correctness eval) and the full
+[experiment arc](docs/experiments/README.md).
 
 ## Architecture
 
@@ -110,6 +114,7 @@ and resume across sessions — without rebuilding context from text.
 ## Demos
 
 ```bash
+racket experiments/e16-agent-grounding/run-eval.rkt  # E16: 10-task agent grounding eval
 racket e15-eval.rkt      # E15: correctness eval — CNF vs grep on 5 tasks
 racket python-demo.rkt   # E14: Python bridge — parse, deps, rename, incremental edit
 racket beagle-demo.rkt   # E13: Beagle bridge — real typed Lisp, full workflow
@@ -127,8 +132,8 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 | **[Language bridges](docs/bridges.md)** | Beagle and Python bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 15 experiments (E1–E15) with raw results |
-| **[Devlog](docs/devlog/)** | 17 entries — discoveries, direction changes, honest numbers |
+| **[Experiments](docs/experiments/)** | 16 experiments (E1–E16) with raw results |
+| **[Devlog](docs/devlog/)** | 18 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests

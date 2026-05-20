@@ -410,16 +410,20 @@ CNF correct on all 5. Grep wrong on all 5:
 This is the experiment the reviewer asked for: not speed, correctness.
 Results: `docs/experiments/e15-correctness/`.
 
-## NOW: E16 — Agent Grounding Evaluation
+## DONE: E16 — Agent Grounding Evaluation
 
-Harness built. 4-module Python codebase (45 functions, 26 tests),
-10 tasks with ground truth, hidden test suite for automated scoring.
+45-function Python codebase, 10 tasks with ground truth. CNF correct
+on 7/7 structural tasks. Text search wrong on 5, unprovable on 2.
+Tasks 05–07 (local code changes) doable by both.
 
-CNF baseline computed: 23 functions affected by round_cents, 25 in
-full_report's tree, 10 uncalled functions. Need to run actual agent
-sessions (text vs CNF) and record results.
+Key results:
+- Rename subtotal: CNF 1 site / 0 FP, text 30 matches / 8+ FP
+- Blast radius: CNF 23 affected, text misses 11 (48%)
+- Full dep tree: CNF 25 functions, text misses 20 (80%)
+- Cross-session: CNF 10/10, text 0/10 (structurally impossible)
 
-See `experiments/e16-agent-grounding/`.
+See `experiments/e16-agent-grounding/` and
+`docs/experiments/e16-agent-grounding/results.md`.
 
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
