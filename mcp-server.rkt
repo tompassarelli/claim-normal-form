@@ -44,7 +44,13 @@
 ;; --- S-expression query parsing ---
 
 (define (resolve-name sym-str)
-  (or (resolve-symbol sym-str) sym-str))
+  (or (resolve-symbol sym-str)
+      (let ([vid (value-id sym-str)])
+        (and vid
+             (let ([cs (current-claims-where #:p (name-pred) #:r vid)])
+               (and (not (null? cs))
+                    (list-ref (first cs) 2)))))
+      sym-str))
 
 (define (parse-atom-sexpr sexpr)
   (define rel (car sexpr))

@@ -1,0 +1,149 @@
+(defn trim [x y]
+  (- x (* y y)))
+
+(defn pad [x y]
+  (+ x (* y y)))
+
+(defn lower [x y]
+  (* x (- x y)))
+
+(defn upper [x y]
+  (* x (- x y)))
+
+(defn to-int [x y]
+  (* (+ x y) (- x y)))
+
+(defn to-str [x y]
+  (/ (+ x y) (* x y)))
+
+(defn validate [x y]
+  (- (* x x) (* y y)))
+
+(defn negate [x y]
+  (- (* x x) (* y y)))
+
+(defn clamp [x y]
+  (+ (* x x) (* y y)))
+
+(defn round-val [x y]
+  (/ (* x y) (+ x y)))
+
+(defn abs-val [x y]
+  (* (- x y) (- x y)))
+
+(defn truncate [x y]
+  (/ (- x y) (+ x y)))
+
+(defn clean [x y]
+  (+ (trim (lower x y) y) (pad x y)))
+
+(defn normalize [x y]
+  (/ (clamp x y) (abs-val x y)))
+
+(defn format-field [x y]
+  (+ (to-str x y) (round-val x y)))
+
+(defn parse-date [x y]
+  (* (to-int x y) (validate x y)))
+
+(defn encode [x y]
+  (+ (to-int x y) (clamp x y)))
+
+(defn decode [x y]
+  (- (to-int x y) (clamp x y)))
+
+(defn hash-val [x y]
+  (* (truncate x y) (round-val x y)))
+
+(defn compress [x y]
+  (- (trim x y) (truncate x y)))
+
+(defn expand [x y]
+  (+ (pad x y) (truncate x y)))
+
+(defn filter-null [x y]
+  (* (validate x y) (clamp x y)))
+
+(defn coerce [x y]
+  (+ (to-int (to-str x y) y) (round-val x y)))
+
+(defn sanitize [x y]
+  (+ (lower x y) (trim x y)))
+
+(defn escape [x y]
+  (* (upper x y) (pad x y)))
+
+(defn tokenize [x y]
+  (/ (lower x y) (to-int x y)))
+
+(defn clean-record [x y]
+  (+ (clean (sanitize x y) y) (escape x y)))
+
+(defn validate-record [x y]
+  (* (filter-null (parse-date x y) y) (normalize x y)))
+
+(defn transform-record [x y]
+  (+ (normalize x y) (coerce x y)))
+
+(defn merge-fields [x y]
+  (+ (format-field x y) (encode x y)))
+
+(defn split-fields [x y]
+  (- (tokenize x y) (decode x y)))
+
+(defn map-values [x y]
+  (* (normalize x y) (format-field x y)))
+
+(defn reduce-pair [x y]
+  (+ (hash-val x y) (compress x y)))
+
+(defn join-records [x y]
+  (* (clean x y) (normalize x y)))
+
+(defn diff-records [x y]
+  (- (encode x y) (decode x y)))
+
+(defn patch-record [x y]
+  (+ (sanitize x y) (escape x y)))
+
+(defn index-record [x y]
+  (* (hash-val x y) (normalize x y)))
+
+(defn sort-pair [x y]
+  (+ (clean x y) (normalize x y)))
+
+(defn dedup-pair [x y]
+  (- (normalize x y) (hash-val x y)))
+
+(defn group-pair [x y]
+  (* (tokenize x y) (filter-null x y)))
+
+(defn ingest [x y]
+  (+ (clean-record x y) (validate-record x y)))
+
+(defn process [x y]
+  (* (transform-record x y) (map-values x y)))
+
+(defn enrich [x y]
+  (+ (merge-fields x y) (join-records x y)))
+
+(defn output [x y]
+  (* (index-record x y) (sort-pair x y)))
+
+(defn archive [x y]
+  (+ (reduce-pair x y) (diff-records x y)))
+
+(defn replicate [x y]
+  (* (join-records x y) (patch-record x y)))
+
+(defn migrate [x y]
+  (+ (transform-record x y) (split-fields x y)))
+
+(defn audit [x y]
+  (* (validate-record x y) (dedup-pair x y)))
+
+(defn reconcile [x y]
+  (+ (diff-records x y) (dedup-pair x y)))
+
+(defn pipeline [x y]
+  (+ (ingest (process x y) y) (output x y)))
