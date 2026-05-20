@@ -496,21 +496,20 @@ agents forked).
 Agent outputs: `experiments/f4-overlap/{git,cnf}/`.
 Results: `docs/experiments/f4-overlap/results.md`.
 
-## NEXT: F5 — Coordination Curve
+## DONE: F5 — Coordination Curve
 
-The killer experiment: throughput vs. agent count. Does CNF
-throughput scale near-linearly while git throughput plateaus?
-Design: same app, increasing agent count (2, 5, 10), measure
-integration test pass rate, merge resolution time, and total
-construction time. The dream graph:
+Eight agents, 28 tests, three tiers (3, 5, 8 agents). Git 25/28
+(89%), CNF 28/28 (100%). All three git failures: temporal divergence
+— on_hold mid-run requirement invisible to forked agents. The
+escalation agent adds on_hold to config.ACTIVE_STATUSES but can't
+add it to workflow.VALID_TRANSITIONS — the merged system is
+internally inconsistent.
 
-```
-Agents    Git throughput    CNF throughput
-1         1x                1x
-2         ~1.5x             ~1.9x
-5         ~2x               ~4.5x
-10        <2x               ~8x
-```
+Across F2-F5: CNF holds at 100% (or 93% with one F3 policy decision)
+while git ranges from 50% to 89%. All failures are structural.
+
+See `docs/experiments/f5-curve/results.md` and
+`docs/devlog/024-f5-coordination-curve.md`.
 
 ## LATER: BEAM Runtime
 

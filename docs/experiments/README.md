@@ -29,6 +29,7 @@ a maintained semantic index than against text files.
 | F2 | Parallel construction | [results](f2-claimdesk/results.md) | **5 agents build CRM app. Git 9/14 integration tests (5 cross-cutting bugs). CNF 14/14. Confirmed with real Claude Code agents.** |
 | F3 | Live graph | [results](f3-live-graph/results.md) | **Sequential agents, accumulated graph. Git 7/14 (5 cross-cutting bugs). CNF 13/14 (0 cross-cutting bugs, 1 policy decision). Live graph pipeline validated.** |
 | F4 | Overlapping edits | [results](f4-overlap/results.md) | **Shared file modification + mid-run requirement. Git 18/21 (3 temporal failures, merge conflicts). CNF 21/21. Three failure modes: merge conflicts, hidden dependencies, temporal divergence.** |
+| F5 | Coordination curve | [results](f5-curve/results.md) | **8 agents, 28 tests, 3 tiers. Git 25/28 (3 temporal divergence). CNF 28/28. All git failures: on_hold mid-run requirement invisible to forked agents.** |
 
 ## The arc
 
@@ -161,3 +162,14 @@ dependencies (audit hooks depend on another agent's workflow fix),
 and temporal divergence (mid-run requirements invisible to forked
 agents). CNF addresses all three through sequential accumulation
 against the live graph.
+
+F5 scaled to eight agents and measured the coordination curve:
+pass rate vs agent count across three tiers (3, 5, 8 agents).
+Same mid-run on_hold requirement as F4. Git 25/28 (89%), CNF
+28/28 (100%). All three git failures are temporal divergence —
+agents can't see changes that happened after they forked. The
+escalation agent added on_hold to config.ACTIVE_STATUSES but
+couldn't add it to workflow.VALID_TRANSITIONS — the merged
+system is internally inconsistent. Across F2-F5, CNF holds at
+100% (or 93% with one F3 policy decision) while git ranges from
+50% to 89%. The failures are always structural, never stochastic.

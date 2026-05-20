@@ -122,6 +122,25 @@ they forked before `on_hold` existed. CNF agents see the updated
 graph and incorporate it naturally. The merge problem scales
 quadratically with agent count; sequential accumulation is O(N).
 
+### F5: Coordination curve
+
+[Eight agents, three tiers](docs/experiments/f5-curve/results.md).
+Pass rate measured at 3, 5, and 8 agent tiers as cross-cutting
+depth increases.
+
+| Tier | Agents | Git | CNF |
+|------|--------|-----|-----|
+| A | 3 | **8/10** | **10/10** |
+| B | 5 | **7/8** | **8/8** |
+| C | 8 | **10/10** | **10/10** |
+| **Total** | **8** | **25/28** | **28/28** |
+
+All three git failures: temporal divergence. The `on_hold` mid-run
+requirement is invisible to forked agents. The escalation agent
+adds on_hold to config but can't add it to the workflow — the
+merged system is internally inconsistent. CNF agents see the
+updated graph and build correctly.
+
 ### E19: Coordination cost
 
 [Five agents on a 45-function codebase](docs/experiments/e19-coordination/results.md).
@@ -161,6 +180,9 @@ is untouched.
 - **F4**: Overlapping edits. Agents modify the same files. Git
   produces merge conflicts and misses mid-run changes. CNF
   accumulates cleanly.
+- **F5**: Coordination curve. Eight agents, three tiers. Git 89%,
+  CNF 100%. All failures are temporal divergence — the same
+  structural cause, now at scale.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -257,8 +279,8 @@ Claude Code MCP configuration (`.claude/settings.json`):
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 19 experiments (E1–E19) with raw results |
-| **[Devlog](docs/devlog/)** | 20 entries — discoveries, direction changes, honest numbers |
+| **[Experiments](docs/experiments/)** | 24 experiments (E1–E19, F2–F5) with raw results |
+| **[Devlog](docs/devlog/)** | 24 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests
@@ -271,13 +293,17 @@ raco test cnf-test/tests/     # run all
 
 ## Limitations and what's next
 
-F2/F3 are existence proofs, not throughput benchmarks. They establish
-that shared semantic state eliminates information-gap bugs during
-parallel construction. The important open question is whether this
-compounds: does CNF throughput scale near-linearly with agent count
-while git throughput plateaus? That requires experiments with
-overlapping concurrent edits, not just separate files — and that's
-the target for F4.
+F2-F5 are existence proofs, not throughput benchmarks. They establish
+that shared semantic state eliminates coordination bugs during
+parallel construction — across information gaps (F2/F3), overlapping
+edits (F4), and scaling agent count (F5). CNF holds at 100% across
+all experiments while git ranges from 50% to 89%.
+
+The CNF pipeline in these experiments is sequential, not concurrent.
+True parallel construction with live graph synchronization is the
+BEAM target — entity-as-process, concurrent claims, real-time
+coordination. These experiments validate the information-sharing
+mechanism; the concurrency mechanism is next.
 
 Benchmarks are at 50–200 functions. The correctness advantage is
 structural (entity references vs string matching) and doesn't depend
