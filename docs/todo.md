@@ -149,7 +149,22 @@ re-analysis. The next test needs conditions that expose the real
 advantage: larger codebase, emergent questions, mutations.
 See `docs/experiments/e8-new-interface/`.
 
-## NEXT: Real Codebase Demo
+## NOW: E9 — The Evolving Codebase
+
+E5–E8 tested the wrong conditions: small, stable, all-questions-known.
+Text agents front-load everything into one Python script and win.
+
+E9 tests the conditions where CNF's structural properties matter:
+sequential task revelation (no front-loading), external mutations
+between tasks (forces re-analysis or proves incremental update),
+50+ functions (scale), and rule evolution (capability gap).
+
+8 rounds, 3 mutations, 50→70 functions. Both agents answer same
+questions about evolving code. The prediction: text costs ~constant
+per round (re-analyze each time), CNF costs drop after Round 1
+(matview absorbs mutations). Design: `docs/experiments/e9-evolving-codebase/`.
+
+## LATER: Real Codebase Demo
 
 Run the MCP server against a non-toy Racket project (50+ functions).
 Show the full workflow: parse, discover, define rules, refactor,

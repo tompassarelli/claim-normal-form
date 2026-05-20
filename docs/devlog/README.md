@@ -15,3 +15,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 006 | 2026-05-20 | [Live agent session: workflow comparison](006-live-agent-session.md) |
 | 007 | 2026-05-20 | [Incremental rule supersession](007-incremental-supersession.md) |
 | 008 | 2026-05-20 | [Interface redesign: the bottleneck shifted](008-interface-redesign.md) |
+| 009 | 2026-05-20 | [What the arenas actually proved (and didn't)](009-what-the-arenas-actually-proved.md) |
