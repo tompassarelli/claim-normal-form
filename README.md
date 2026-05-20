@@ -328,6 +328,22 @@ for all-or-nothing transactions
 **Transactions (3 tools):**
 `tx_log`, `current_tx_seq`, `set_agent`
 
+### MCP Resources
+
+The server exposes structured data as [MCP Resources](https://modelcontextprotocol.io/docs/concepts/resources)
+— pushed into agent context instead of requiring tool calls:
+
+| URI | Content |
+|-----|---------|
+| `cnf://summary` | Object/claim counts, form overview |
+| `cnf://dependencies` | fn-depends-on edges |
+| `cnf://functions` | Function names and signatures |
+| `cnf://rules` | User-defined Datalog rules |
+
+Resources eliminate the status → query → list_rules round-trip pattern
+that dominated early experiments. The agent starts with structural
+understanding already in context.
+
 ### Key workflows
 
 **Parse and query:**
@@ -436,9 +452,53 @@ let, fn, match, cond, when, do, for, loop, try, vec, map, method-call,
 kw-access, and more. 18 predicates. Run `racket beagle-demo.rkt` for
 the full demonstration.
 
-The MCP server operates on beagle source by default — `parse_program`,
-`render`, `rename`, `add_function`, `modify_function`, `remove_function`
-all use the beagle bridge.
+The MCP server auto-detects language — `parse_program`, `render`,
+`rename`, `add_function`, `modify_function`, `remove_function` work
+with both beagle and Python source.
+
+## Python Bridge (`python-lang.rkt`)
+
+Second language bridge — parses Python source via `python3` subprocess
+(AST → JSON) into the same claim graph. Proves the pattern is
+language-agnostic: write a parser, get structural analysis for free.
+
+```racket
+(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "python-lang.rkt")
+
+(reset-store!)
+(setup-eval!)
+(setup-graph!)
+(setup-python-lang!)
+
+;; Parse Python source into claims
+(define fns (parse-python-program! "
+def trade_value(trade: Trade) -> float:
+    return trade.quantity * trade.price
+
+def portfolio_value(portfolio: Portfolio) -> float:
+    total = sum(trade_value(t) for t in portfolio.trades)
+    return total + portfolio.cash
+"))
+
+;; Query cross-function dependencies (derived by Datalog)
+(query (py-fn-depends-on (? caller) (? callee)))
+;; => portfolio_value -> trade_value
+
+;; Rename: one claim, zero find-replace
+(rename! (first fns) "compute_trade_value")
+(render-python-program fns)
+;; => portfolio_value's call site says "compute_trade_value"
+
+;; Incremental edit (no reparse)
+(add-python-function! "def weighted(p: Portfolio, w: float) -> float:
+    return portfolio_value(p) * w
+")
+```
+
+14 predicates. 30+ Python AST node types handled: functions, classes,
+decorators, type annotations, async, comprehensions, control flow,
+match statements. Run `racket python-demo.rkt` for the full
+demonstration.
 
 ## Performance
 
@@ -504,6 +564,22 @@ modify-function!+rename: 1.2 ms
 
 Run `racket beagle-demo.rkt` to reproduce.
 
+Python bridge (E14):
+
+```
+9 forms (2 classes, 7 typed functions), 542 objects, 338 claims
+Parse:                  55 ms    (includes python3 subprocess)
+py-fn-depends-on (7 edges): 0 ms (matview hit)
+py-trans-dep (15 pairs):    0 ms (matview hit)
+Materialize:            8 ms
+Rename:                 0.03 ms  (propagates to 2 callers)
+Render all 9:           0.6 ms
+add-python-function!:   52 ms    (python3 subprocess dominates)
+modify-python-function!: 51 ms   (python3 subprocess dominates)
+```
+
+Run `racket python-demo.rkt` to reproduce.
+
 **Honest limitations:**
 - Materialization cost scales with output size. Rules producing O(N²)
   tuples (shared-dep, hub-pair) can take seconds at N=100.
@@ -515,7 +591,7 @@ Run `racket beagle-demo.rkt` to reproduce.
 
 ## Tests
 
-103 tests across 9 files:
+118 tests across 10 files:
 
 ```
 racket cnf-test.rkt           # 11 kernel tests
@@ -527,4 +603,5 @@ racket lang-test.rkt          # 15 lang tests (incl. incremental parse)
 racket tx-test.rkt            # 16 transaction tests (incl. agent identity)
 racket rwlock-test.rkt        # 6 MVCC snapshot isolation tests
 racket beagle-lang-test.rkt   # 15 beagle bridge tests (parse, deps, rename, render)
+racket python-lang-test.rkt  # 15 python bridge tests (parse, deps, rename, render)
 ```

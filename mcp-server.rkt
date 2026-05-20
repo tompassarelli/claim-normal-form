@@ -12,7 +12,8 @@
          "eval.rkt"
          "graph.rkt"
          "schema.rkt"
-         "beagle-lang.rkt")
+         "beagle-lang.rkt"
+         "python-lang.rkt")
 
 ;; --- Transport ---
 
@@ -40,6 +41,7 @@
   (setup-schema!)
   (setup-rule-predicates!)
   (setup-beagle-lang!)
+  (setup-python-lang!)
   (materialize!))
 
 (define default-checkpoint-path
@@ -401,11 +403,12 @@
    ;; Lang
    (hasheq
     'name "parse_program"
-    'description "Parse beagle source into the claim graph. Handles defn, def, defrecord, and expressions. Returns entity IDs with form types. Strips #lang line automatically."
+    'description "Parse source into the claim graph. Auto-detects language (Python or beagle). Returns entity IDs with form types. Pass language: 'python' or 'beagle' to override."
     'inputSchema (hasheq
       'type "object"
       'properties (hasheq
-        'source (hasheq 'type "string" 'description "Source text to parse"))
+        'source (hasheq 'type "string" 'description "Source text to parse")
+        'language (hasheq 'type "string" 'description "Language: 'python' or 'beagle'. Auto-detected if omitted."))
       'required '("source")))
 
    (hasheq
@@ -558,6 +561,132 @@
         'source (hasheq 'type "string"
                         'description "New beagle function definition, e.g. (defn foo [(x : Int) (y : Int)] : Int (* x y))"))
       'required '("name" "source")))))
+
+;; --- Resource generation ---
+
+(define (generate-resource uri)
+  (case uri
+    [("cnf://summary")
+     (define obj-count (length (all-objects)))
+     (define claim-count (length (claims-where)))
+     (define fn-deps
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (query (fn-depends-on (? caller) (? callee)))))
+     (define py-deps
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (query (py-fn-depends-on (? caller) (? callee)))))
+     (define all-deps (append fn-deps py-deps))
+     (define rules
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (current-claims-where #:p (ctx-ref* 'rule-head-rel-pred-id))))
+     (define txs (all-txs))
+     (define recent-txs (if (> (length txs) 5)
+                            (take-right txs 5)
+                            txs))
+     (string-join
+      (list
+       (format "=== Codebase Understanding (CNF claim graph) ===")
+       (format "Objects: ~a | Claims: ~a | Dependencies: ~a"
+               obj-count claim-count (length all-deps))
+       (format "Rules: ~a | Transactions: ~a"
+               (length rules) (length txs))
+       ""
+       (if (null? all-deps) "No dependencies tracked yet."
+           (string-join
+            (cons "Dependencies:"
+                  (for/list ([d (in-list all-deps)])
+                    (define ck (if (hash-has-key? d 'caller) 'caller 'caller))
+                    (define callee-key (if (hash-has-key? d 'callee) 'callee 'callee))
+                    (format "  ~a -> ~a"
+                            (render-ref (hash-ref d ck))
+                            (render-ref (hash-ref d callee-key)))))
+            "\n"))
+       ""
+       (if (null? recent-txs) "No transactions yet."
+           (string-join
+            (cons "Recent transactions:"
+                  (for/list ([tx (in-list recent-txs)])
+                    (define seq (hash-ref tx 'seq "?"))
+                    (define agent (hash-ref tx 'agent #f))
+                    (define claim-count (length (hash-ref tx 'claim-ids '())))
+                    (format "  tx-~a: ~a claims~a"
+                            seq claim-count
+                            (if agent (format " (agent: ~a)" agent) ""))))
+            "\n")))
+      "\n")]
+
+    [("cnf://dependencies")
+     (define fn-deps
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (query (fn-depends-on (? caller) (? callee)))))
+     (define py-deps
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (query (py-fn-depends-on (? caller) (? callee)))))
+     (define all-deps (append fn-deps py-deps))
+     (if (null? all-deps)
+         "No dependencies. Parse a program first."
+         (string-join
+          (cons (format "~a dependency edges:" (length all-deps))
+                (for/list ([d (in-list all-deps)])
+                  (format "  ~a -> ~a"
+                          (render-ref (hash-ref d 'caller))
+                          (render-ref (hash-ref d 'callee)))))
+          "\n"))]
+
+    [("cnf://functions")
+     (define fn-deps
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (query (fn-depends-on (? caller) (? callee)))))
+     (define py-deps
+       (with-handlers ([exn:fail? (lambda (_) '())])
+         (query (py-fn-depends-on (? caller) (? callee)))))
+     (define all-deps (append fn-deps py-deps))
+     (define dep-map (make-hash))
+     (for ([d all-deps])
+       (define caller (hash-ref d 'caller))
+       (hash-update! dep-map caller (lambda (v) (add1 v)) 0))
+     (define rdep-map (make-hash))
+     (for ([d all-deps])
+       (define callee (hash-ref d 'callee))
+       (hash-update! rdep-map callee (lambda (v) (add1 v)) 0))
+     (define all-fns
+       (remove-duplicates
+        (append (map (lambda (d) (hash-ref d 'caller)) all-deps)
+                (map (lambda (d) (hash-ref d 'callee)) all-deps))))
+     (if (null? all-fns)
+         "No functions indexed. Parse a program first."
+         (string-join
+          (cons (format "~a functions:" (length all-fns))
+                (for/list ([f (in-list all-fns)])
+                  (define calls-out (hash-ref dep-map f 0))
+                  (define called-by (hash-ref rdep-map f 0))
+                  (format "  ~a (calls: ~a, called-by: ~a)"
+                          (render-ref f) calls-out called-by)))
+          "\n"))]
+
+    [("cnf://rules")
+     (define rules-text
+       (with-handlers ([exn:fail? (lambda (_) "No rules found.")])
+         (define rule-pred (ctx-ref* 'rule-head-rel-pred-id))
+         (define rule-src-pred (ctx-ref* 'rule-source-pred-id))
+         (define rule-claims (current-claims-where #:p rule-pred))
+         (if (null? rule-claims) "No user-defined rules."
+             (string-join
+              (cons (format "~a rules:" (length rule-claims))
+                    (for/list ([c (in-list rule-claims)])
+                      (define rule-id (list-ref c 2))
+                      (define rel-name (resolve-value (list-ref c 3)))
+                      (define src-claims (current-claims-where #:l rule-id #:p rule-src-pred))
+                      (define src (if (null? src-claims) "?"
+                                      (resolve-value (list-ref (first src-claims) 3))))
+                      (format "  [~a] ~a: ~a" rule-id rel-name src)))
+              "\n"))))
+     rules-text]
+
+    [else (format "Unknown resource: ~a" uri)]))
+
+(define (ctx-ref* key)
+  (hash-ref (cnf-ctx-ext (current-ctx)) key #f))
 
 ;; --- Tool handlers ---
 
@@ -742,49 +871,58 @@
 
     [("parse_program")
      (define source (hash-ref arguments 'source))
-     (define fns (parse-beagle-program! source))
+     (define lang-override (hash-ref arguments 'language #f))
+     (define lang
+       (or lang-override
+           (if (or (regexp-match? #rx"^\\s*def " source)
+                   (regexp-match? #rx"^\\s*class " source)
+                   (regexp-match? #rx"^\\s*import " source)
+                   (regexp-match? #rx"^\\s*from " source))
+               "python" "beagle")))
+     (define fns
+       (if (equal? lang "python")
+           (parse-python-program! source)
+           (parse-beagle-program! source)))
+     (define fk-pred
+       (if (equal? lang "python") (py-form-kind-pred) (form-kind-pred)))
      (define form-lines
        (for/list ([f (in-list fns)])
-         (define kind-cs (current-claims-where #:l f #:p (form-kind-pred)))
+         (define kind-cs (current-claims-where #:l f #:p fk-pred))
          (define kind (and (not (null? kind-cs))
                           (resolve-value (list-ref (first kind-cs) 3))))
          (format "  ~a: ~a (~a)" f (render-ref f) (or kind "?"))))
-     (define schema-accessors
-       `(("name" ,(name-pred)) ("body" ,(body-pred)) ("calls" ,(calls-pred))
-         ("has-param" ,(has-param-pred)) ("position" ,(position-pred))
-         ("has-type" ,(has-type-pred)) ("return-type" ,(return-type-pred))
-         ("expr-kind" ,(expr-kind-pred)) ("has-arg" ,(has-arg-pred))
-         ("has-child" ,(has-child-pred)) ("has-field" ,(has-field-pred))
-         ("form-kind" ,(form-kind-pred)) ("is-private" ,(is-private-pred))
-         ("has-binding" ,(has-binding-pred)) ("binding-value" ,(binding-value-pred))
-         ("has-condition" ,(has-condition-pred)) ("has-then" ,(has-then-pred))
-         ("has-else" ,(has-else-pred)) ("rest-param" ,(rest-param-pred))
-         ("symbol" ,(symbol-predicate-id)) ("supersedes" ,(supersedes-pred))))
-     (define schema-lines
-       (for/list ([pair (in-list schema-accessors)])
-         (format "  ~a: ~a" (first pair) (second pair))))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
+     (define dep-relation
+       (if (equal? lang "python") "py-fn-depends-on" "fn-depends-on"))
      (string-join
       (append
-       (list (format "Parsed ~a form(s) (~a objects, ~a claims):"
-                     (length fns) obj-count claim-count))
+       (list (format "Parsed ~a form(s) [~a] (~a objects, ~a claims):"
+                     (length fns) lang obj-count claim-count))
        form-lines
-       (list "" "Schema (predicate name -> ID, usable as bare symbols in queries):")
-       schema-lines
-       (list "" "Built-in derived relations (already materialized):"
-             "  fn-depends-on(caller, callee) — function-level dependency"
-             "  contains-call(expr, fn) — transitive call-site containment"
+       (list ""
+             (format "Dependency relation: ~a(caller, callee)" dep-relation)
+             "Use query tool with this relation to discover cross-function dependencies."
              ""
-             "Tip: In queries and rules, use bare symbol names instead of IDs."
-             "  e.g. (current-triple (? fn) body (? b)) instead of (current-triple (? fn) \"34\" (? b))"))
+             "Resources available (inject into context):"
+             "  cnf://summary — codebase overview + deps + recent changes"
+             "  cnf://dependencies — full dependency graph"
+             "  cnf://functions — function index with call counts"
+             "  cnf://rules — all Datalog rules"))
       "\n")]
 
     [("render")
      (define ids (hash-ref arguments 'ids))
-     (if (= (length ids) 1)
-         (render-beagle-fn (first ids))
-         (render-beagle-program ids))]
+     (define first-id (first ids))
+     (define fk-claims (current-claims-where #:l first-id #:p (py-form-kind-pred)))
+     (define is-python (not (null? fk-claims)))
+     (if is-python
+         (if (= (length ids) 1)
+             (render-python-fn first-id)
+             (render-python-program ids))
+         (if (= (length ids) 1)
+             (render-beagle-fn first-id)
+             (render-beagle-program ids)))]
 
     [("rename")
      (define id (hash-ref arguments 'id))
@@ -886,7 +1024,11 @@
 
     [("add_function")
      (define source (hash-ref arguments 'source))
-     (define fn-id (add-beagle-function! source))
+     (define lang (hash-ref arguments 'language #f))
+     (define is-python (or (equal? lang "python")
+                          (and (not lang) (regexp-match? #rx"^\\s*def " source))))
+     (define fn-id
+       (if is-python (add-python-function! source) (add-beagle-function! source)))
      (define fn-name (render-ref fn-id))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
@@ -895,7 +1037,10 @@
 
     [("remove_function")
      (define fn-name (hash-ref arguments 'name))
-     (define fn-id (remove-beagle-function! fn-name))
+     (define fn-id
+       (with-handlers ([exn:fail? (lambda (_)
+                         (remove-python-function! fn-name))])
+         (remove-beagle-function! fn-name)))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
      (format "Removed function ~a (id: ~a). Claims invalidated. Graph: ~a objects, ~a claims."
@@ -904,7 +1049,13 @@
     [("modify_function")
      (define fn-name (hash-ref arguments 'name))
      (define source (hash-ref arguments 'source))
-     (define fn-id (modify-beagle-function! fn-name source))
+     (define lang (hash-ref arguments 'language #f))
+     (define is-python (or (equal? lang "python")
+                          (and (not lang) (regexp-match? #rx"^\\s*def " source))))
+     (define fn-id
+       (if is-python
+           (modify-python-function! fn-name source)
+           (modify-beagle-function! fn-name source)))
      (define new-name (render-ref fn-id))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
@@ -929,7 +1080,8 @@
              'id id
              'result (hasheq
                'protocolVersion "2024-11-05"
-               'capabilities (hasheq 'tools (hasheq))
+               'capabilities (hasheq 'tools (hasheq)
+                                    'resources (hasheq))
                'serverInfo (hasheq 'name "cnf-server"
                                    'version "0.2.0")))]
 
@@ -937,6 +1089,38 @@
 
     [("ping")
      (hasheq 'jsonrpc "2.0" 'id id 'result (hasheq))]
+
+    [("resources/list")
+     (hasheq 'jsonrpc "2.0"
+             'id id
+             'result (hasheq 'resources
+               (list
+                (hasheq 'uri "cnf://summary"
+                        'name "Codebase Summary"
+                        'description "High-level overview: function count, dependencies, rules, recent changes. Inject into agent context for persistent memory."
+                        'mimeType "text/plain")
+                (hasheq 'uri "cnf://dependencies"
+                        'name "Dependency Graph"
+                        'description "All fn-depends-on edges. The agent's structural understanding of the codebase."
+                        'mimeType "text/plain")
+                (hasheq 'uri "cnf://functions"
+                        'name "Function Index"
+                        'description "All functions with types, params, and dependency counts."
+                        'mimeType "text/plain")
+                (hasheq 'uri "cnf://rules"
+                        'name "Datalog Rules"
+                        'description "All defined rules (built-in and user-defined). Shows accumulated agent understanding."
+                        'mimeType "text/plain"))))]
+
+    [("resources/read")
+     (define uri (hash-ref params 'uri ""))
+     (define content (generate-resource uri))
+     (hasheq 'jsonrpc "2.0"
+             'id id
+             'result (hasheq 'contents
+               (list (hasheq 'uri uri
+                             'mimeType "text/plain"
+                             'text content))))]
 
     [("tools/list")
      (hasheq 'jsonrpc "2.0"

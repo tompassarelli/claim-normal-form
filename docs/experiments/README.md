@@ -20,6 +20,7 @@ a maintained semantic index than against text files.
 | E11 | Multi-agent | [results](e11-multi-agent/results.md) | Two agents, shared graph. Cross-agent rule composition. **Text can't do this.** |
 | E12 | Real demo | [results](e12-real-demo/results.md) | 100 fns, full workflow: parse→rules→refactor→evolve. Incremental parse works. |
 | E13 | Beagle bridge | [results](e13-beagle-bridge/results.md) | Real language (30+ form types). Parse→deps→rename→edit works end-to-end. |
+| E14 | Python bridge | [results](e14-python-bridge/results.md) | Second language. Subprocess parse, same engine. Language-agnostic MCP. |
 
 ## The arc
 
@@ -60,3 +61,11 @@ rules that COMPOSE Agent A's derived relations. tx_log shows clean
 agent attribution. This is structurally impossible for text agents —
 there's no shared mutable substrate to inherit, compose on, or
 attribute through.
+
+E12-E13 proved real-world applicability: 100-function codebases with
+incremental parse, real beagle syntax with 30+ form types.
+
+E14 added the second language (Python) and proved the pattern is
+language-agnostic. The claim graph engine is the same — only the
+parser changes. MCP Resources shift the bottleneck from tool-call
+round-trips to context injection.

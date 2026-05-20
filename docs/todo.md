@@ -358,6 +358,44 @@ expressions. Run `racket beagle-demo.rkt` to reproduce.
 
 Results: `docs/experiments/e13-beagle-bridge/`.
 
+## DONE: Python Bridge
+
+`python-lang.rkt` — second language bridge, proving the pattern is
+language-agnostic. Python source → `python3` subprocess (AST → JSON)
+→ Racket bridge → claim graph. 14 predicates, 2 Datalog rules.
+
+Parser helper: `python-ast-helper.py` (~390 lines) handles 30+ AST
+node types via Python's `ast` module. Bridge: `python-lang.rkt`
+(~550 lines) creates entities and claims from JSON.
+
+Same incremental operations: `add-python-function!`,
+`remove-python-function!`, `modify-python-function!`. Same renderer
+pattern. 15 Python-specific tests.
+
+Subprocess adds ~50ms per parse. Post-parse operations identical to
+beagle — same engine, same speed. Results: `docs/experiments/e14-python-bridge/`.
+
+## DONE: MCP Resources
+
+Four resources exposed via `resources/list` and `resources/read`:
+`cnf://summary`, `cnf://dependencies`, `cnf://functions`, `cnf://rules`.
+
+Push structured data into agent context instead of requiring tool calls.
+Eliminates the status/query/list_rules round-trips that dominated E5-E8.
+
+## DONE: Language-Agnostic MCP Server
+
+`mcp-server.rkt` auto-detects Python vs beagle from source syntax.
+All 30 tools work with both languages. Single agent session can parse
+and analyze code in either language through the same interface.
+
+## DONE: E14 — Python Bridge Demo
+
+Same financial analytics domain as E13, in Python. 2 classes, 7 typed
+functions. Parse (55ms) → 542 objects, 338 claims → 7 direct deps,
+15 transitive pairs → rename (0.03ms) → incremental edit (add + modify
++ rename). Run `racket python-demo.rkt` to reproduce.
+
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
 Current MVCC gives snapshot isolation for reads with serialized writes.
