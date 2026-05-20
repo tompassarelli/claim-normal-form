@@ -205,6 +205,52 @@ recompute — built on claims about claims.
 
 Run `racket demo.rkt` to see the full demonstration.
 
+## Lang layer (`lang.rkt`)
+
+Text as projection of the claim graph. Parse a tiny functional
+language into claims. Render claims back to text. Rename by claim,
+edit by supersession — text updates automatically.
+
+```racket
+(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "lang.rkt")
+
+(reset-store!)
+(setup-eval!)
+(setup-graph!)
+(setup-lang!)
+
+;; Parse source text into claims
+(define fns (parse-program! "
+(defn base-rate [hours level]
+  (* hours level))
+
+(defn total-pay [hours level]
+  (+ (base-rate hours level) 100))
+"))
+
+;; Render claims back to text (round-trips exactly)
+(render-program fns)
+
+;; Rename: 1 claim, 0 find-replace
+(rename! (first fns) "hourly-rate")
+(render-program fns)
+;; => total-pay's call site now says "hourly-rate" automatically
+
+;; Change operator via supersession
+(define body (get-body (first fns)))
+(define builtins (ctx-ref 'builtins))
+(change-operand! body (op-pred)
+  (hash-ref builtins '*)
+  (hash-ref builtins '+))
+(render-program fns)  ;; => hourly-rate body now says (+ hours level)
+
+;; Query structural dependencies (derived by Datalog, not declared)
+(query (fn-depends-on (? caller) (? callee)))
+;; => total-pay depends on hourly-rate
+```
+
+Run `racket lang-demo.rkt` for the full thesis demonstration.
+
 ## Performance
 
 Claim store lookups are indexed — `claims-where` with constraints
@@ -238,4 +284,5 @@ racket datalog-test.rkt  # 9 datalog tests
 racket eval-test.rkt     # 6 evaluator tests
 racket demo-test.rkt     # 8 graph layer tests
 racket schema-test.rkt   # 10 schema layer tests
+racket lang-test.rkt     # 8 lang layer tests
 ```
