@@ -2,113 +2,107 @@
 
 A structural reasoning scaffold for coding agents.
 
+## The problem: private cognition
+
+When multiple agents build software in parallel, each agent
+understands the program privately — which functions exist, what calls
+what, what states are possible. That understanding dies when the
+session ends. The next agent starts from scratch. The bugs that
+result are not in any single module. **The failures are in the gaps
+between features** — each module is correct in isolation but
+inconsistent with others.
+
+This is not a testing problem. You cannot test for states you don't
+know exist. An analytics agent can't exclude archived tickets from
+active counts if it doesn't know the archived state exists. A
+permissions agent can't gate the archive action if it never saw the
+workflow module. The test suite passes because each feature is
+self-consistent. The bugs are in the gaps.
+
+The enemy is not text, not grep, not git. The enemy is **cognition
+trapped inside isolated agent sessions**.
+
+## What CNF does
+
+CNF externalizes program understanding into durable shared structure.
+
 Instead of treating source code as text, CNF treats it as claims about
-stable identities. A function is not the string `"add"`. It is an
-entity with a current name claim. A call site points at the function
-entity, not at matching characters. Renaming `add` to `sum_two` is one
-new claim, not a repository-wide string edit.
+stable identities. A function is an entity with a current name claim,
+not a string. A call site points at the entity, not at matching
+characters. This model persists across sessions, spans agents, and
+updates incrementally as the program changes.
 
-**[How CNF works](docs/overview.md)** — a concrete walkthrough of how
-a function becomes claims, why rename is O(1), and what this means for
-agents.
+The value proposition is the same as a type system: not "catch trivial
+errors" but give the agent a stable model to reason against while the
+program is changing. Types stabilize reasoning during construction.
+CNF stabilizes coordination during collaboration.
 
-## The problem
-
-Coding agents work on text. Their understanding of a program — which
-functions exist, what calls what, what depends on what — is private
-cognition that dies when the session ends. The next agent starts from
-scratch: re-reads every file, re-greps every symbol, re-derives every
-dependency. This isn't a performance problem. It's a correctness
-problem.
-
-When Agent A renames a function via regex, it also renames unrelated
-parameters that happen to share the name. Agent B arrives later to add
-a feature, but Agent A's rename silently changed the code Agent B's
-edit targets — the edit fails silently, the test suite doesn't catch
-it, and nobody knows until production.
-
-Text-based coordination shares *artifacts*. It doesn't share
-*understanding*. Every agent reasons alone, from scratch, against
-strings.
-
-## What CNF provides
-
-CNF gives agents a shared structural model of the program that
-persists while the program changes. The model has four layers:
-
-1. **Program facts** — "function A calls B", "entity X has parameter
-   Y." Produced by parsing source into the claim graph.
-2. **Derived facts** — "A transitively depends on C", "X is dead
-   code." Produced by Datalog rules, materialized and cached.
-3. **Agent actions** — "Agent A renamed this entity", "Agent B removed
-   that function." Recorded in the transaction log.
-4. **Composable rules** — Agent B defines new rules that compose on
-   Agent A's derived relations. Knowledge compounds across sessions.
-
-This is the same value proposition as a type system: not "catch trivial
-errors" but "give the agent a stable model to reason against while the
-program is changing." A type checker prevents invalid compositions
-during construction. CNF prevents invalid coordination during
-collaboration — rename only the function entity, not the parameter
-entity. Identify dead code by entity references, not string matching.
-Know the blast radius of a change before making it.
+**[How CNF works](docs/overview.md)** — a concrete walkthrough.
 
 ## Evidence
 
-[E19](docs/experiments/e19-coordination/results.md) puts five agents
-on a 45-function codebase (6 modules). Each agent has a real task:
-map structure, rename a function, remove dead code, add a feature,
-audit the result.
+### F2: Parallel feature construction
+
+[Five agents build a CRM app](docs/experiments/f2-claimdesk/results.md)
+— workflow, permissions, audit, notifications, analytics. The features
+cross-cut: notifications must suppress for archived tickets, analytics
+must exclude them from active counts, permissions must include the
+archive action.
+
+| | Git | CNF |
+|--|--:|--:|
+| Integration tests | **9/14** | **14/14** |
+| Cross-cutting bugs | **5** | **0** |
+
+The git agents are not wrong. They are locally rational — each builds
+a correct module from the information available. The bugs emerge from
+fragmented world models. The CNF notification agent imported
+`TERMINAL_STATUSES` from the workflow module because the claim graph
+told it those entities exist. The git notification agent guessed
+terminal states from domain intuition (`{"closed", "resolved"}`) and
+missed `"archived"` entirely. Not an intelligence difference. Not a
+prompt difference. One system shared semantic structure; the other
+relied on local reconstruction.
+
+Replicated across two runs with real Claude Code agents (16 agents
+total). The four structural bugs appear in every git run and never
+in any CNF run.
+
+### E19: Coordination cost
+
+[Five agents on a 45-function codebase](docs/experiments/e19-coordination/results.md).
+Each agent has a real task: map structure, rename, remove dead code,
+add a feature, audit.
 
 | | Git | CNF |
 |--|---:|---:|
-| Total discoveries | 89 | 6 |
-| Wasted on rediscovery | **50 (56%)** | **0 (0%)** |
+| Wasted on rediscovery | **50 ops (56%)** | **0 (0%)** |
 | Dead code correctly identified | 5/7 | 7/7 |
 | Downstream edit silently broken | yes | no |
 
-The rediscovery numbers matter, but the correctness failures matter
-more. In the git condition:
-
-- **Regex rename damages downstream work.** Agent B renames function
-  `subtotal` → `compute_subtotal` via `\bsubtotal\b`. This also
-  renames the `subtotal` *parameter* in an unrelated function. Agent D
-  later tries to modify that function — the edit fails silently because
-  the parameter name no longer matches. The test suite passes. Nobody
-  notices.
-
-- **Dead code detection gets false positives.** Grepping for function
-  names finds string matches in dict keys and comments. Agent C keeps
-  2 dead functions alive because their names appear in unrelated
-  contexts. CNF checks entity references: zero false positives.
-
-In the CNF condition, Agent B renames the function *entity* — one name
-claim. The parameter entity (a different object that happens to share
-the name) is untouched. Agent D's edit succeeds. Agent C queries
-callers via the materialized dependency graph: 7/7 dead functions
-identified. Each agent inherits all prior agents' structural knowledge
-via one checkpoint restore.
-
-Both conditions pass the same 26 tests. The difference is in
-structural correctness that the test suite can't cover.
+Regex rename damages downstream work: renames the function *and* an
+unrelated parameter sharing the name. A later edit fails silently.
+Tests pass. CNF renames the entity — one claim. The parameter entity
+is untouched.
 
 ### The experiment arc
 
-19 experiments tracked the evolution from speed benchmarks to
-structural correctness to multi-agent coordination. The key
-inflection points:
+20 experiments tracked the evolution. Key inflection points:
 
 - **E15–E16**: CNF answers structural queries correctly (entity
   resolution, transitive closure, shadowed names). Text search gets
   them wrong. Not faster — *correct*.
-- **E17–E18**: Both agents pass all tests. CNF gets 30/30 hidden
-  contract tests; text gets 26/30. Rope (real semantic tool) ties
-  CNF on single-language rename, but provides no persistent state,
-  no rule engine, no cross-session memory.
-- **E19**: Shared structural model eliminates redundant work *and*
-  prevents cascading correctness failures across agents.
+- **E17–E18**: Both agents pass all tests. Hidden contract tests:
+  CNF 30/30, text 26/30. Rope (real semantic tool) ties CNF on
+  single-language rename but provides no persistent state, no rule
+  engine, no cross-session memory.
+- **E19**: Shared model eliminates 56% rediscovery *and* prevents
+  cascading correctness failures.
+- **F2**: Construction, not maintenance. The cross-cutting bugs
+  are structural — they follow from the information gap, not from
+  agent randomness.
 
-See the full [experiment arc](docs/experiments/README.md) (E1–E19).
+See the full [experiment arc](docs/experiments/README.md).
 
 ## Architecture
 
@@ -215,19 +209,14 @@ Claude Code MCP configuration (`.claude/settings.json`):
 raco test cnf-test/tests/     # run all
 ```
 
-## Honest limitations
+## Limitations
 
-- Benchmarks are at 50–200 functions, not 50,000. The correctness
-  advantage is structural (entity references vs string matching) and
-  doesn't depend on scale, but performance at large scale is unproven.
-- Materialization cost scales with output size. Rules producing O(N²)
-  tuples can take seconds at N=100.
-- `modify-function!` at 584ms worst case (retract + reparse +
-  rematerialize).
-- Python bridge adds ~50ms per operation from subprocess overhead.
-  Complex syntax (dicts, generators, f-strings) doesn't round-trip
-  through render.
-- Experiments use scripted agents, not LLM agents. The structural
-  advantages (entity precision, shared state, composable rules) are
-  architectural properties that don't depend on the agent
-  implementation, but real-agent validation is future work.
+F2 is an existence proof, not a statistical benchmark. The important
+result is structural: agents missing shared state produced the exact
+classes of integration bugs predicted by the information gap.
+
+Benchmarks are at 50–200 functions. The correctness advantage is
+structural (entity references vs string matching) and doesn't depend
+on scale, but performance at large scale is unproven. Materialization
+cost scales with output size. Python bridge adds ~50ms subprocess
+overhead per operation.

@@ -2,32 +2,38 @@
 
 ## Context for external readers
 
-This is a status report on **Claim Normal Form (CNF)** — a structural
-reasoning scaffold for coding agents. Instead of treating source code
-as text (strings, files, grep), CNF treats it as claims about stable
-identities. A function is an entity with a current name claim, not a
-string. A call site points at the entity, not at matching characters.
+**Claim Normal Form (CNF)** is a structural reasoning scaffold for
+coding agents. Instead of treating source code as text, CNF treats it
+as claims about stable identities. A function is an entity with a
+current name claim, not a string. A call site points at the entity,
+not at matching characters.
 
-The project is implemented in Racket. It includes a claim graph kernel,
-a Datalog rule engine with materialized views, an MCP server (30 tools),
-and language bridges for Python, Racket, and Beagle (a typed Lisp).
-19 experiments (E1–E19) tracked the evolution from speed benchmarks
-to structural correctness to multi-agent coordination.
+Implemented in Racket: claim graph kernel, Datalog rule engine with
+materialized views, MCP server (30 tools), language bridges for
+Python, Racket, and Beagle. 20 experiments tracked the evolution from
+speed benchmarks to structural correctness to multi-agent coordination.
 
-The core thesis: **agents that share a structural model of the program
-produce fewer cross-cutting bugs than agents that share text files.**
+## The central insight
 
-## The reframe: reasoning scaffold, not shared memory
+**The failures are in the gaps between features.** Each module is
+correct in isolation but inconsistent with others. The agents are not
+wrong — they are locally rational. The bugs emerge from fragmented
+world models.
 
-Early experiments (E1–E9) measured speed — how many MCP calls, how
-many milliseconds. This was the wrong frame. The real value of CNF
-is not "faster" but "correct in ways text can't be."
+The enemy is not text, not grep, not git. The enemy is **cognition
+trapped inside isolated agent sessions**. CNF externalizes cognition
+into durable shared structure.
 
-The analogy that crystallized the direction: **CNF is to agents what
-a type system is to programmers.** Not "catch trivial errors" but
-"give the agent a stable model to reason against while the program
-is changing." A type checker prevents invalid compositions during
-construction. CNF prevents invalid coordination during collaboration.
+The analogy: **CNF is to agents what a type system is to programmers.**
+Types are not valuable mainly because "int vs string." They are
+valuable because they stabilize reasoning during change. CNF
+stabilizes coordination during collaboration.
+
+## The reframe
+
+Early experiments (E1–E9) measured speed — MCP calls, milliseconds.
+Wrong frame. The real value is not "faster" but "correct in ways
+text can't be."
 
 This reframe happened during E15–E18, where the experiments shifted
 from speed comparisons to structural correctness:
@@ -141,29 +147,26 @@ information gap: if you can't see workflow.py, you can't know
 archived exists. No amount of LLM intelligence overcomes missing
 information.
 
-## What the experiments prove (and don't)
+## What this means
 
-**What they prove:**
-- Agents sharing a structural model produce fewer cross-cutting bugs
-  than agents sharing only text files.
-- The failures are in the *gaps between features* — each module is
-  correct in isolation but inconsistent with others. This is not a
-  testing problem (you can't test for states you don't know exist).
-- The root cause is *private cognition* — each agent's understanding
-  dies with its session. CNF externalizes that understanding into a
-  shared graph.
+F2 is an existence proof, not a statistical benchmark. The important
+result is structural: agents missing shared state produced the exact
+classes of integration bugs predicted by the information gap.
+Replicated across two runs (16 agents total) — the four structural
+bugs appear in every git run and never in any CNF run.
 
-**What they don't prove:**
-- This is not yet a "10x faster" demo. F2 proves correctness, not
-  speed. The construction was constrained (separate files, no shared
-  modifications, graph context provided as text not live queries).
-- The codebase is small (13 base functions + 5 feature modules).
-  The hypothesis is that the advantage grows with scale, but that's
-  unproven.
-- Single model, single run. LLM outputs are non-deterministic. The
-  structural prediction is robust (git agents miss archived state
-  because the information isn't available) but exact failure counts
-  could vary across runs.
+The cleanest evidence: the CNF notification agent imported
+`TERMINAL_STATUSES` from the workflow module because the claim graph
+told it those entities exist. The git notification agent guessed
+terminal states from domain intuition (`{"closed", "resolved"}`) and
+missed `"archived"` entirely. Not an intelligence difference. Not a
+prompt difference. One system shared semantic structure; the other
+relied on local reconstruction.
+
+F2 does not yet prove speed. The construction was constrained
+(separate files, no shared modifications, graph context provided as
+text not live queries). The hypothesis that shared structure enables
+faster construction is the target for F3.
 
 ## Architecture summary
 
@@ -217,13 +220,6 @@ against a live-updating graph. True parallel construction where the
 CNF graph is the coordination layer, not just a read-only context
 provider.
 
-**BEAM runtime** (later): Entity = process. Claim = message. Each
-entity serializes its own claim updates locally while the system
-remains massively parallel. Not needed to prove the thesis, needed
-when the question shifts from "does the model work?" to "can N agents
-use it at production scale?"
-
-The standard for "done": not a benchmark, not a paper — a real app
-built 10x faster because of this architecture. F2 is the first step.
-The five bugs are the proof that the information gap is real. The
-next step is closing it at scale.
+F2 proved: fewer integration failures during parallel construction.
+The hypothesis for F3: shared structure also enables faster
+construction. That is the target, not a proven result.
