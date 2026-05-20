@@ -12,15 +12,22 @@
          set-supersedes-pred!
          current-claims-where)
 
-;; Datalog over CNF — naive bottom-up fixpoint evaluation.
+;; Datalog over CNF — index-aware evaluation.
 ;;
-;; Base relations (EDB):
-;;   (claim Id L P R) — claim with its own object ID
-;;   (triple L P R)   — projection without claim ID
-;;   (current-claim Id L P R) — unsuperseded claims only
-;;   (current-triple L P R)   — unsuperseded triples only
-;;   (value Id Literal) — value objects and their grounded literals
-;;   (object Id)      — all object IDs
+;; Base relations (EDB) dispatch to the live claim store using
+;; hash indexes. Bound variables from prior joins constrain the
+;; lookup, avoiding full scans.
+;;
+;; Derived relations (IDB) accumulate during fixpoint iteration
+;; in a separate hash.
+;;
+;; Base relations:
+;;   (claim Id L P R)
+;;   (triple L P R)
+;;   (current-claim Id L P R) — unsuperseded only
+;;   (current-triple L P R)   — unsuperseded only
+;;   (value Id Literal)
+;;   (object Id)
 
 (struct var (name) #:transparent)
 (struct atom (rel args) #:transparent)
@@ -29,7 +36,7 @@
 (define-syntax-rule (? name)
   (var 'name))
 
-;; --- Rules and supersession state (stored in context extensions) ---
+;; --- Rules and supersession state ---
 
 (define (supersedes-pred-id)
   (ctx-ref 'supersedes-pred-id #f))
@@ -38,14 +45,8 @@
   (ctx-set! 'supersedes-pred-id id))
 
 (define (current-claims-where #:l [l #f] #:p [p #f] #:r [r #f])
-  (define sup-id (supersedes-pred-id))
   (define all (claims-where #:l l #:p p #:r r))
-  (if sup-id
-      (let ([superseded (make-hash)])
-        (for ([row (claims-where #:p sup-id)])
-          (hash-set! superseded (list-ref row 3) #t))
-        (filter (lambda (c) (not (hash-ref superseded (first c) #f))) all))
-      all))
+  (filter (lambda (c) (not (superseded? (first c)))) all))
 
 (define (reset-rules!)
   (ctx-set! 'rules '()))
@@ -68,57 +69,12 @@
     [(_ body-clause ...)
      (run-query (list (parse-atom body-clause) ...))]))
 
-;; --- EDB extraction ---
-
-(define (extract-edb)
-  (define db (make-hash))
-  (define all-claims (claims-where))
-  (define sup-id (supersedes-pred-id))
-  (define superseded (make-hash))
-  (when sup-id
-    (for ([row (in-list all-claims)]
-          #:when (equal? (list-ref row 1) sup-id))
-      (hash-set! superseded (list-ref row 3) #t)))
-  (hash-set! db 'claim
-    (for/list ([row all-claims])
-      (list (list-ref row 0)
-            (list-ref row 2)
-            (list-ref row 1)
-            (list-ref row 3))))
-  (hash-set! db 'triple
-    (for/list ([row all-claims])
-      (list (list-ref row 2)
-            (list-ref row 1)
-            (list-ref row 3))))
-  (define current
-    (filter (lambda (row) (not (hash-ref superseded (list-ref row 0) #f)))
-            all-claims))
-  (hash-set! db 'current-claim
-    (for/list ([row current])
-      (list (list-ref row 0)
-            (list-ref row 2)
-            (list-ref row 1)
-            (list-ref row 3))))
-  (hash-set! db 'current-triple
-    (for/list ([row current])
-      (list (list-ref row 2)
-            (list-ref row 1)
-            (list-ref row 3))))
-  (hash-set! db 'value
-    (for/list ([id (all-objects)]
-               #:when (value-object? id))
-      (list id (resolve-value id))))
-  (hash-set! db 'object
-    (for/list ([id (all-objects)])
-      (list id)))
-  db)
-
 ;; --- Literal resolution ---
 
 (define (resolve-literal v)
   (cond
     [(var? v) v]
-    [(member v (all-objects)) v]
+    [(object-exists? v) v]
     [else
      (define vid (value-id v))
      (or vid v)]))
@@ -147,10 +103,115 @@
          [else #f]))
      (and s (match-tuple (cdr pattern) (cdr tuple) s))]))
 
-(define (match-atom-against-db db a subst)
-  (define tuples (hash-ref db (atom-rel a) '()))
-  (filter-map (lambda (tuple) (match-tuple (atom-args a) tuple subst))
-              tuples))
+;; --- Index-aware base relation evaluation ---
+;;
+;; claims-where returns rows as (cid p l r).
+;; Base relation tuple layouts:
+;;   triple:         (L P R)       = (row[2] row[1] row[3])
+;;   claim:          (Id L P R)    = (row[0] row[2] row[1] row[3])
+;;   current-triple: same as triple, filtered by superseded?
+;;   current-claim:  same as claim, filtered by superseded?
+
+(define edb-relations '(claim triple current-claim current-triple value object))
+
+(define (resolve-arg arg subst)
+  (if (var? arg)
+      (hash-ref subst (var-name arg) arg)
+      arg))
+
+(define (bound? v) (not (var? v)))
+
+(define (row->triple c)
+  (list (list-ref c 2) (list-ref c 1) (list-ref c 3)))
+
+(define (row->claim-tuple c)
+  (list (list-ref c 0) (list-ref c 2) (list-ref c 1) (list-ref c 3)))
+
+(define (eval-triple-base args resolved subst use-current?)
+  (define l (and (bound? (list-ref resolved 0)) (list-ref resolved 0)))
+  (define p (and (bound? (list-ref resolved 1)) (list-ref resolved 1)))
+  (define r (and (bound? (list-ref resolved 2)) (list-ref resolved 2)))
+  (define claims
+    (if use-current?
+        (current-claims-where #:l l #:p p #:r r)
+        (claims-where #:l l #:p p #:r r)))
+  (filter-map
+   (lambda (c) (match-tuple args (row->triple c) subst))
+   claims))
+
+(define (eval-claim-base args resolved subst use-current?)
+  (define cid-val (and (bound? (list-ref resolved 0)) (list-ref resolved 0)))
+  (cond
+    [cid-val
+     (define fields (get-claim cid-val))
+     (if (and fields (or (not use-current?) (not (superseded? cid-val))))
+         (filter-map
+          (lambda (t) (match-tuple args t subst))
+          (list (list cid-val (first fields) (second fields) (third fields))))
+         '())]
+    [else
+     (define l (and (bound? (list-ref resolved 1)) (list-ref resolved 1)))
+     (define p (and (bound? (list-ref resolved 2)) (list-ref resolved 2)))
+     (define r (and (bound? (list-ref resolved 3)) (list-ref resolved 3)))
+     (define claims
+       (if use-current?
+           (current-claims-where #:l l #:p p #:r r)
+           (claims-where #:l l #:p p #:r r)))
+     (filter-map
+      (lambda (c) (match-tuple args (row->claim-tuple c) subst))
+      claims)]))
+
+(define (eval-value-base args resolved subst)
+  (define id-val (and (bound? (list-ref resolved 0)) (list-ref resolved 0)))
+  (define lit-val (and (bound? (list-ref resolved 1)) (list-ref resolved 1)))
+  (cond
+    [id-val
+     (if (value-object? id-val)
+         (filter-map
+          (lambda (t) (match-tuple args t subst))
+          (list (list id-val (resolve-value id-val))))
+         '())]
+    [lit-val
+     (define vid (value-id lit-val))
+     (if vid
+         (filter-map
+          (lambda (t) (match-tuple args t subst))
+          (list (list vid lit-val)))
+         '())]
+    [else
+     (filter-map
+      (lambda (t) (match-tuple args t subst))
+      (for/list ([id (all-objects)] #:when (value-object? id))
+        (list id (resolve-value id))))]))
+
+(define (eval-object-base args resolved subst)
+  (define id-val (and (bound? (list-ref resolved 0)) (list-ref resolved 0)))
+  (cond
+    [id-val
+     (if (object-exists? id-val)
+         (list subst)
+         '())]
+    [else
+     (filter-map
+      (lambda (t) (match-tuple args t subst))
+      (for/list ([id (all-objects)]) (list id)))]))
+
+(define (match-atom db a subst)
+  (define rel (atom-rel a))
+  (define args (atom-args a))
+  (cond
+    [(memq rel edb-relations)
+     (define resolved (map (lambda (x) (resolve-arg x subst)) args))
+     (case rel
+       [(current-triple) (eval-triple-base args resolved subst #t)]
+       [(triple)         (eval-triple-base args resolved subst #f)]
+       [(current-claim)  (eval-claim-base args resolved subst #t)]
+       [(claim)          (eval-claim-base args resolved subst #f)]
+       [(value)          (eval-value-base args resolved subst)]
+       [(object)         (eval-object-base args resolved subst)])]
+    [else
+     (define tuples (hash-ref db rel '()))
+     (filter-map (lambda (t) (match-tuple args t subst)) tuples)]))
 
 ;; --- Body evaluation ---
 
@@ -158,7 +219,7 @@
   (cond
     [(null? atoms) (list subst)]
     [else
-     (define matches (match-atom-against-db db (car atoms) subst))
+     (define matches (match-atom db (car atoms) subst))
      (for*/list ([s (in-list matches)]
                  [result (in-list (eval-body db (cdr atoms) s))])
        result)]))
@@ -203,7 +264,7 @@
     (for/list ([r (in-list (ctx-ref 'rules '()))])
       (dl-rule (resolve-atom-literals (dl-rule-head r))
                (map resolve-atom-literals (dl-rule-body r)))))
-  (define db (fixpoint (extract-edb) resolved-rules))
+  (define db (fixpoint (make-hash) resolved-rules))
   (eval-body db resolved-query (hasheq)))
 
 (define (show-results results)

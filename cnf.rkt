@@ -19,7 +19,10 @@
          current-ctx
          make-cnf-ctx
          ctx-ref
-         ctx-set!)
+         ctx-set!
+         superseded?
+         object-exists?
+         get-claim)
 
 ;; --- Context ---
 
@@ -35,7 +38,8 @@
    idx-by-lp      ; mutable-hash: (l . p) -> (listof cid)
    idx-by-pr      ; mutable-hash: (p . r) -> (listof cid)
    symbol-pred-id ; box(string-or-#f)
-   ext))          ; mutable-hash: symbol -> any (module extensions)
+   ext            ; mutable-hash: symbol -> any (module extensions)
+   superseded))   ; mutable-hash: cid -> #t (maintained on claim!)
 
 (define current-ctx (make-parameter #f))
 
@@ -92,6 +96,9 @@
   (hash-set! (cnf-ctx-objects ctx) id #t)
   (hash-set! (cnf-ctx-claims ctx) id (claim-rec l p r))
   (index-claim! id l p r)
+  (define sup-pred (ctx-ref 'supersedes-pred-id #f))
+  (when (and sup-pred (equal? p sup-pred))
+    (hash-set! (cnf-ctx-superseded ctx) r #t))
   id)
 
 ;; --- Bootstrap ---
@@ -101,7 +108,7 @@
     (cnf-ctx
      (box 0) (make-hash) (make-hash) (make-hash) (make-hash)
      (make-hash) (make-hash) (make-hash) (make-hash) (make-hash)
-     (box #f) (make-hash)))
+     (box #f) (make-hash) (make-hash)))
   (parameterize ([current-ctx ctx])
     (define sym-id (entity!))
     (set-box! (cnf-ctx-symbol-pred-id ctx) sym-id)
@@ -178,6 +185,18 @@
 
 (define (all-objects)
   (hash-keys (cnf-ctx-objects (current-ctx))))
+
+;; --- Supersession + introspection ---
+
+(define (superseded? cid)
+  (hash-has-key? (cnf-ctx-superseded (current-ctx)) cid))
+
+(define (object-exists? id)
+  (hash-has-key? (cnf-ctx-objects (current-ctx)) id))
+
+(define (get-claim cid)
+  (define rec (hash-ref (cnf-ctx-claims (current-ctx)) cid #f))
+  (and rec (list (claim-rec-l rec) (claim-rec-p rec) (claim-rec-r rec))))
 
 ;; --- Reset ---
 

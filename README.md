@@ -253,28 +253,44 @@ Run `racket lang-demo.rkt` for the full thesis demonstration.
 
 ## Performance
 
-Claim store lookups are indexed — `claims-where` with constraints
-uses hash indexes rather than full scans.
+The Datalog engine uses **index-aware evaluation**: base relation
+lookups (`current-triple`, `triple`, `value`, etc.) dispatch to
+hash indexes during joins rather than scanning all tuples.
+Supersession state is maintained incrementally — `current-claims-where`
+is O(matching) not O(all supersession claims).
 
 Incremental recompute touches only the affected subgraph:
 
 ```
 105 expressions (5-deep chain + 100 independent)
-Full build:        ~4000 ms
-Incremental (5):   ~400 ms   (10x faster, 100 nodes untouched)
+Full build:        ~930 ms
+Incremental (5):   ~90 ms   (10x faster, 100 nodes untouched)
 ```
 
 Run `racket bench.rkt` to reproduce.
 
+Agent-oriented operations at scale:
+
+```
+200 functions (chain dependencies)
+Rename + render 1 fn:  < 0.1 ms  (O(1) — constant regardless of N)
+Render all 200:        ~2 ms
+Dependency query:      ~34 ms   (Datalog fixpoint — the bottleneck)
+Text string-replace:   ~0.1 ms  (for comparison)
+```
+
+Run `racket engine-bench.rkt` to reproduce.
+
 **Honest limitations:**
-- Datalog uses naive bottom-up fixpoint — each eval step runs a full
-  fixpoint pass over all derived facts. This is the performance
-  bottleneck, not claim lookup.
-- Indexes accelerate `claims-where` and `current-claims-where`, but
-  the Datalog engine itself does not yet use them during fixpoint
-  iteration.
+- Datalog still uses naive bottom-up fixpoint. Each query recomputes
+  all derived facts from scratch. Semi-naive evaluation would avoid
+  redundant re-derivation.
 - The incremental win comes from evaluating fewer steps (5 instead
-  of 105), not from faster individual steps.
+  of 105), not from faster individual steps. Each step is ~4x faster
+  with index-aware evaluation than the naive EDB-copy approach.
+- Dependency queries via Datalog are slower than grep for simple
+  cases. The structural advantage is correctness (guaranteed complete
+  transitive closure) not speed.
 
 ## Tests
 
