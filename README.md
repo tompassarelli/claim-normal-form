@@ -1,284 +1,96 @@
-# claim-normal-form
+# Claim Normal Form
 
-Software should not primarily live as text files. It should live as a claim graph where code, data, names, history, dependencies, runtime events, errors, patches, and explanations are all first-class addressable objects.
+CNF is a persistent semantic graph for software projects.
 
-A data-modeling normal form where everything is objects and claims.
-In-memory Racket kernel + Datalog query engine.
+Instead of treating source code as text, CNF treats it as claims about
+stable identities. Functions, names, parameters, calls, dependencies,
+history, runtime events, and agent actions are all addressable objects
+in one graph.
 
-**[How CNF works](docs/overview.md)** — start here. A concrete walkthrough
-of how a trivial function becomes claims, why rename is O(1), and what
-this means for AI agents.
+Text becomes a projection of the graph, not the source of truth.
 
-See [specification.md](specification.md) for the full spec.
+The immediate use case is AI coding agents. Agents working over text
+rediscover program structure every session. CNF gives them stable
+handles, persistent derived facts, semantic rename, dependency queries,
+and cross-session memory.
+
+A function is not the string `"add"`. It is an entity with a current
+name claim. A call site does not point at the characters `add`. It
+points at the function entity. So renaming `add` to `sum_two` is one
+new claim, not a repository-wide string edit.
+
+**[How CNF works](docs/overview.md)** — a concrete walkthrough of how
+a function becomes claims, why rename is O(1), and what this means for
+agents. Start here.
+
+## Why it matters: text search gets structural questions wrong
+
+AI coding agents often answer structural questions by searching text:
+what calls this function, what breaks if it changes, what should be
+renamed, what is dead code?
+
+[E15](docs/experiments/e15-correctness/results.md) tests that failure
+mode on a 50-function Python codebase with ground-truth answers:
+
+| Task | CNF | Text search |
+|------|-----|-------------|
+| "What's affected if `round_cents` changes?" | **17 functions** | 9 — misses 47% |
+| "Rename `subtotal` — what call sites change?" | **6 exact sites** | false positives from dict keys/strings |
+| "Which `process` is being called?" | **resolved by entity** | conflates shadowed/similar names |
+| "Which functions are dead code?" | **7 definitive** | unreliable — strings/comments match as "calls" |
+| "Full dependency tree of `full_report`?" | **21 functions** | 7 — misses 67% |
+
+The point is not speed. The point is correctness. Text search does not
+know what an identifier refers to. CNF does, because references point to
+stable entities, not matching strings. After parse and materialization,
+these answers come from cached derived views.
+
+Run `racket e15-eval.rkt` to reproduce.
+
+## Architecture
+
+```
+cnf.rkt            Entity/Value/Claim kernel — objects, claims, indexed lookups
+datalog.rkt        Semi-naive Datalog — derived facts, materialized views, delta propagation
+eval.rkt           Graph evaluator — Datalog finds redexes, claims record results
+graph.rkt          Names, supersession, rename, dependency tracking
+schema.rkt         Ergonomic CRUD — entity/claims, lookup, find-by, update
+lang.rkt           Toy language bridge — parse/render/rename round-trip
+beagle-lang.rkt    Beagle bridge — real typed Lisp, 30+ form types, 18 predicates
+python-lang.rkt    Python bridge — AST via subprocess, 30+ node types, 14 predicates
+mcp-server.rkt     30 MCP tools over JSON-RPC 2.0 — the agent control surface
+```
+
+Two language bridges prove the pattern is language-agnostic. Adding a
+new language means writing a frontend that maps its AST into entities
+and claims. Dependency queries, rename propagation, history, MCP tools,
+and materialized views are shared infrastructure.
 
 ## The ontology
 
 ```
 Object = addressable identity
-
 Entity = object only           (entity!)
 Value  = object + literal      (value!)  — interned, canonical
-Claim  = object + (l p r)      (claim!)
+Claim  = object + (l p r)      (claim!)  — itself an object
 ```
 
-```
-Entity ⊂ Object
-Value  ⊂ Object
-Claim  ⊂ Object
-
-claim : Object × Object × Object → Claim
-```
-
-The fact shape is `(l p r)` — each slot can be any object. A predicate
-is just an object occupying the middle position. This is not EAV renamed;
-EAV defines roles inside a fact, CNF defines kinds of addressable object.
-
-> **Object is addressability. Claim is assertion. Value is grounding.
-> Entity is referent.**
-
-## Kernel API (`cnf.rkt`)
-
-```racket
-(entity!)              ; pure referent — the thing before description
-(value! "Tom")         ; canonical literal — interned (same string = same ID)
-(value-object? id)     ; #t if id is a value object (use instead of truthiness)
-(claim! left pred right) ; assertion connecting objects
-
-(named! "edge")        ; sugar: entity + symbol claim
-(claim-v! l p "val")   ; sugar: value + claim
-
-(resolve-symbol "edge") ; find entity by symbol name
-(resolve-value id)      ; look up literal grounding
-(claims-about id)       ; claims where id is left
-(claims-where #:l l #:p p #:r r)  ; filtered claim query (indexed)
-```
-
-Claim lookups are indexed by `l`, `p`, `r`, `(l,p)`, and `(p,r)`.
-Constrained queries hit the appropriate index instead of scanning
-all claims.
-
-All state lives in an opaque `cnf-ctx` struct. Multiple independent
-graphs via `parameterize`:
-
-```racket
-(define ctx-a (make-cnf-ctx))
-(define ctx-b (make-cnf-ctx))
-
-(parameterize ([current-ctx ctx-a])
-  (entity!)   ; goes to ctx-a
-  (value! 42) ; goes to ctx-a
-  ...)
-```
-
-## Datalog (`datalog.rkt`)
-
-Semi-naive bottom-up evaluation over the claim graph.
-
-```racket
-(require "cnf.rkt" "datalog.rkt")
-
-;; Literals resolve automatically — no value joins needed
-(query (triple (? x) name "Tom"))
-
-;; Define derived relations
-(define-rule (named-thing (? obj) (? name-val))
-  (triple (? obj) (? sym) (? name-val))
-  (triple (? sym) (? sym) "symbol"))
-
-(query (named-thing (? who) (? what)))
-
-;; Recursive rules (transitive closure)
-(define-rule (path (? x) (? y))
-  (triple (? x) edge-pred (? y)))
-(define-rule (path (? x) (? z))
-  (triple (? x) edge-pred (? y))
-  (path (? y) (? z)))
-```
-
-Base relations:
-- `(claim Id L P R)` — full claim with object ID
-- `(triple L P R)` — convenience projection
-- `(current-claim Id L P R)` — unsuperseded claims only
-- `(current-triple L P R)` — unsuperseded triples only
-- `(value Id Literal)` — value objects and their grounded literals
-- `(object Id)` — all object IDs
-
-## Evaluator (`eval.rkt`)
-
-Small-step graph evaluator. Datalog finds redexes, Racket executes
-primitives, claims record eval events.
-
-```racket
-(require "cnf.rkt" "datalog.rkt" "eval.rkt")
-
-(setup-eval!)
-
-(define add-op (named! "add"))
-(register-primitive! add-op +)
-
-(define e (expr! add-op (value! 2) (value! 3)))
-(define env (entity!))
-(define evs (run! env))
-
-(eval-result (first evs))  ; => 5
-```
-
-Nested expressions work — inner results feed outer operands
-automatically via Datalog derivation:
-
-```racket
-(define inner (expr! add-op (value! 1) (value! 2)))
-(define outer (expr! mul-op inner (value! 4)))
-(run! env)  ; evaluates inner first, then outer => 12
-```
-
-Eval events are ordinary claims — queryable like anything else:
-
-```racket
-(query (triple (? ev) (evaluated-pred) (? expr)))
-(query (triple (? ev) (result-pred) (? val)))
-```
-
-## Schema layer (`schema.rkt`)
-
-Ergonomic data modeling — CRUD over claims without touching the
-raw kernel API.
-
-```racket
-(require "cnf.rkt" "datalog.rkt" "schema.rkt")
-
-(setup-schema!)
-
-;; Predicates are just objects — batch-create them
-(define-predicates name email status assigned-to)
-
-;; Create entities with properties
-(define alice (entity/claims [name "Alice"] [email "alice@co.com"]))
-(define bob   (entity/claims [name "Bob"]   [email "bob@co.com"]))
-
-(define task-1 (entity/claims [name "Fix login bug"] [status "open"]))
-(link! task-1 assigned-to alice)
-
-;; Lookup
-(lookup alice name)            ; => "Alice"
-(lookup task-1 assigned-to)    ; => alice's entity ID
-(find-by status "open")        ; => (list task-1)
-(find-by assigned-to alice)    ; => (list task-1)
-
-;; Update (supersession — old values preserved as history)
-(update! alice email "alice@newco.com")
-(lookup alice email)            ; => "alice@newco.com"
-
-;; Retract / unlink
-(retract! alice email)
-(unlink! task-1 assigned-to alice)
-```
-
-No tables, no schema migrations, no foreign key declarations.
-Predicates are objects. Relationships are claims. History is free.
-
-## Graph layer (`graph.rkt`)
-
-Supersession, semantic rename, dependency tracking, incremental
-recompute — built on claims about claims.
-
-```racket
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt")
-
-(setup-eval!)
-(setup-graph!)
-
-;; Names are claims, not identity
-(define fn-1 (entity!))
-(give-name! fn-1 "calculate-pay")
-(render-ref fn-1)  ; => "calculate-pay"
-
-;; Rename: one new claim, zero references changed
-(rename! fn-1 "compute-pay")
-(render-ref fn-1)  ; => "compute-pay"
-
-;; Dependencies derived from graph structure, not declared
-;; expr-depends-on and affected are Datalog rules over current-triple
-
-;; Incremental recompute: change one operand, recompute only affected
-(change-operand! expr-1 (right-pred) old-val new-val)
-(recompute-affected! env expr-1)
-;; Only downstream expressions re-evaluated; unaffected nodes untouched
-;; Old eval events remain queryable as provenance
-```
-
-Run `racket demo.rkt` to see the full demonstration.
-
-## Lang layer (`lang.rkt`)
-
-Text as projection of the claim graph. Parse a tiny functional
-language into claims. Render claims back to text. Rename by claim,
-edit by supersession — text updates automatically.
-
-```racket
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "lang.rkt")
-
-(reset-store!)
-(setup-eval!)
-(setup-graph!)
-(setup-lang!)
-
-;; Parse source text into claims
-(define fns (parse-program! "
-(defn base-rate [hours level]
-  (* hours level))
-
-(defn total-pay [hours level]
-  (+ (base-rate hours level) 100))
-"))
-
-;; Render claims back to text (round-trips exactly)
-(render-program fns)
-
-;; Rename: 1 claim, 0 find-replace
-(rename! (first fns) "hourly-rate")
-(render-program fns)
-;; => total-pay's call site now says "hourly-rate" automatically
-
-;; Change operator via supersession
-(define body (get-body (first fns)))
-(define builtins (ctx-ref 'builtins))
-(change-operand! body (op-pred)
-  (hash-ref builtins '*)
-  (hash-ref builtins '+))
-(render-program fns)  ;; => hourly-rate body now says (+ hours level)
-
-;; Query structural dependencies (derived by Datalog, not declared)
-(query (fn-depends-on (? caller) (? callee)))
-;; => total-pay depends on hourly-rate
-```
-
-Run `racket lang-demo.rkt` for the full thesis demonstration.
-
-## MCP Server (`mcp-server.rkt`)
-
-30 tools over JSON-RPC 2.0 / stdio. Claude Code connects and operates
-on the claim graph directly.
-
-### Quick start
+The fact shape is `(l p r)` — each slot is an object. This is not EAV
+with different names. In EAV, the row is an implementation detail. In
+CNF, the claim itself is an object: it can be named, superseded,
+explained, attributed to an agent, assigned a transaction, or used as
+the subject of later claims. Reification is the default, not a bolt-on.
+
+## Quick start
 
 ```bash
-# Prerequisites: Racket 8.x
-racket --version
-
-# Stdio mode (Claude Code connects via MCP)
-racket mcp-server.rkt
-
-# Daemon mode (TCP, multi-client, auto-restores from checkpoint)
-racket mcp-server.rkt --daemon 7888
-
-# Bridge mode (stdio proxy to running daemon)
-racket mcp-server.rkt --connect 7888
+# Prerequisites: Racket 8.x, Python 3.x (for Python bridge)
+racket mcp-server.rkt           # stdio mode
+racket mcp-server.rkt --daemon 7888   # daemon mode (multi-client, MVCC)
+racket mcp-server.rkt --connect 7888  # bridge to running daemon
 ```
 
-### Claude Code configuration
-
-Add to your MCP settings (`.claude/settings.json`):
+Claude Code MCP configuration (`.claude/settings.json`):
 
 ```json
 {
@@ -291,321 +103,62 @@ Add to your MCP settings (`.claude/settings.json`):
 }
 ```
 
-For daemon mode (shared state across sessions):
+CNF exposes the graph over MCP, so agents can parse programs, query
+dependencies, rename entities, define Datalog rules, checkpoint state,
+and resume across sessions — without rebuilding context from text.
 
-```json
-{
-  "mcpServers": {
-    "cnf": {
-      "command": "racket",
-      "args": ["/path/to/cnf-racket/mcp-server.rkt", "--connect", "7888"]
-    }
-  }
-}
-```
-
-### Tool reference
-
-**Core (6 tools):**
-`reset`, `create_entity`, `create_named`, `create_value`, `claim`, `status`
-
-**Query (6 tools):**
-`query`, `inspect`, `resolve_symbol`, `claims_where`, `lookup`, `find_by`
-
-**Rules (3 tools):**
-`define_rule`, `list_rules`, `supersede_rule`
-
-**Schema (2 tools):**
-`define_predicates`, `update`
-
-**Program (6 tools):**
-`parse_program`, `render`, `rename`, `add_function`, `remove_function`,
-`modify_function`
-
-**Batch (1 tool):**
-`batch` — multiple operations in one call, with optional `atomic: true`
-for all-or-nothing transactions
-
-**Persistence (2 tools):**
-`checkpoint`, `restore`
-
-**Transactions (3 tools):**
-`tx_log`, `current_tx_seq`, `set_agent`
-
-### MCP Resources
-
-The server exposes structured data as [MCP Resources](https://modelcontextprotocol.io/docs/concepts/resources)
-— pushed into agent context instead of requiring tool calls:
-
-| URI | Content |
-|-----|---------|
-| `cnf://summary` | Object/claim counts, form overview |
-| `cnf://dependencies` | fn-depends-on edges |
-| `cnf://functions` | Function names and signatures |
-| `cnf://rules` | User-defined Datalog rules |
-
-Resources eliminate the status → query → list_rules round-trip pattern
-that dominated early experiments. The agent starts with structural
-understanding already in context.
-
-### Key workflows
-
-**Parse and query:**
-```
-parse_program(source) → fn IDs + schema
-query("(fn-depends-on (? caller) (? callee))")
-```
-
-**Define custom rules:**
-```
-define_rule(head: "(trans-dep (? f) (? g))", body: "(fn-depends-on (? f) (? g))")
-define_rule(head: "(trans-dep (? f) (? g))", body: "(fn-depends-on (? f) (? m)) (trans-dep (? m) (? g))")
-query("(trans-dep some-function (? dep))")
-```
-
-**Incremental edit (no reparse):**
-```
-add_function(source: "(defn new-fn (x y) (+ (existing-fn x y) 1))")
-modify_function(name: "old-fn", source: "(defn old-fn (x y) (* x y))")
-remove_function(name: "deprecated-fn")
-# All rules and matviews auto-update through the mutations
-```
-
-**Cross-session persistence:**
-```
-checkpoint()   # save graph to ~/.cnf/checkpoint.json
-# ... new session ...
-restore()      # rebuild full graph + rules + matviews
-```
-
-**Multi-agent collaboration:**
-```
-set_agent(name: "structural-analyst")
-# ... define rules, query ...
-checkpoint()
-
-# Agent B:
-restore()
-set_agent(name: "quality-checker")
-list_rules()   # see Agent A's rules
-# ... define rules composing Agent A's derived relations ...
-tx_log()       # see interleaved agent transactions
-```
-
-### Daemon mode
-
-The daemon uses MVCC (multi-version concurrency control). Readers get
-a snapshot of the committed state and run without any lock — multiple
-queries execute concurrently with zero contention. Writers serialize
-and publish a new snapshot on commit. Multiple Claude Code instances
-can connect via bridge mode and share the same claim graph.
+## Demos
 
 ```bash
-# Terminal 1: start daemon
-racket mcp-server.rkt --daemon 7888
-
-# Terminal 2: agent A
-racket mcp-server.rkt --connect 7888
-
-# Terminal 3: agent B
-racket mcp-server.rkt --connect 7888
+racket e15-eval.rkt      # E15: correctness eval — CNF vs grep on 5 tasks
+racket python-demo.rkt   # E14: Python bridge — parse, deps, rename, incremental edit
+racket beagle-demo.rkt   # E13: Beagle bridge — real typed Lisp, full workflow
+racket lang-demo.rkt     # Toy language — thesis demonstration
+racket demo.rkt          # Graph layer — rename, dependency, incremental recompute
 ```
 
-## Beagle Integration (`beagle-lang.rkt`)
+## Documentation
 
-Bridge from [beagle](https://github.com/tompassarelli/beagle) (typed
-Lisp, 50+ forms, 6 emit targets) to the CNF claim graph. Beagle's
-existing parser produces AST structs; the bridge walks them into
-entities and claims.
-
-```racket
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "beagle-lang.rkt")
-
-(reset-store!)
-(setup-eval!)
-(setup-graph!)
-(setup-beagle-lang!)
-
-;; Parse beagle source into claims
-(define fns (parse-beagle-program! "
-(defrecord Trade [(symbol : String) (qty : Int) (price : Float)])
-
-(defn trade-value [(t : Trade)] : Float
-  (* (trade-qty t) (trade-price t)))
-
-(defn portfolio-total [(p : Portfolio)] : Float
-  (reduce + 0.0 (mapv trade-value (portfolio-trades p))))
-"))
-
-;; Query cross-function dependencies (derived by Datalog)
-(query (fn-depends-on (? caller) (? callee)))
-;; => portfolio-total -> trade-value
-
-;; Rename: one claim, zero find-replace
-(rename! (first fns) "compute-trade-value")
-(render-beagle-program fns)
-;; => portfolio-total's call site says "compute-trade-value"
-
-;; Incremental edit (no reparse)
-(add-beagle-function! "(defn net-value [(t : Trade)] : Float
-  (- (compute-trade-value t) 0.01))")
-```
-
-30+ beagle form types handled: defn, defrecord, def, call, if, if-let,
-let, fn, match, cond, when, do, for, loop, try, vec, map, method-call,
-kw-access, and more. 18 predicates. Run `racket beagle-demo.rkt` for
-the full demonstration.
-
-The MCP server auto-detects language — `parse_program`, `render`,
-`rename`, `add_function`, `modify_function`, `remove_function` work
-with both beagle and Python source.
-
-## Python Bridge (`python-lang.rkt`)
-
-Second language bridge — parses Python source via `python3` subprocess
-(AST → JSON) into the same claim graph. Proves the pattern is
-language-agnostic: write a parser, get structural analysis for free.
-
-```racket
-(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "python-lang.rkt")
-
-(reset-store!)
-(setup-eval!)
-(setup-graph!)
-(setup-python-lang!)
-
-;; Parse Python source into claims
-(define fns (parse-python-program! "
-def trade_value(trade: Trade) -> float:
-    return trade.quantity * trade.price
-
-def portfolio_value(portfolio: Portfolio) -> float:
-    total = sum(trade_value(t) for t in portfolio.trades)
-    return total + portfolio.cash
-"))
-
-;; Query cross-function dependencies (derived by Datalog)
-(query (py-fn-depends-on (? caller) (? callee)))
-;; => portfolio_value -> trade_value
-
-;; Rename: one claim, zero find-replace
-(rename! (first fns) "compute_trade_value")
-(render-python-program fns)
-;; => portfolio_value's call site says "compute_trade_value"
-
-;; Incremental edit (no reparse)
-(add-python-function! "def weighted(p: Portfolio, w: float) -> float:
-    return portfolio_value(p) * w
-")
-```
-
-14 predicates. 30+ Python AST node types handled: functions, classes,
-decorators, type annotations, async, comprehensions, control flow,
-match statements. Run `racket python-demo.rkt` for the full
-demonstration.
-
-## Performance
-
-The Datalog engine uses **semi-naive evaluation** with
-**materialized views** and **index-aware base relation dispatch**:
-
-- **Materialized views**: `materialize!` caches all derived facts.
-  New claims delta-propagate through rules incrementally — views
-  stay current without re-running the fixpoint. Supersession
-  invalidates affected views; next query recomputes and re-caches.
-- **Semi-naive fixpoint**: EDB-only rules fire once. IDB rules
-  iterate with delta restriction — each iteration only considers
-  rule variants where at least one IDB body atom uses new facts
-  from the previous iteration. Avoids redundant re-derivation.
-- **Index-aware joins**: base relation lookups (`current-triple`,
-  `triple`, `value`, etc.) dispatch to hash indexes during joins
-  rather than scanning all tuples.
-- **Maintained supersession**: `current-claims-where` is O(matching)
-  not O(all supersession claims).
-
-Agent-oriented operations at scale:
-
-```
-200 functions (chain dependencies)
-Dep query (cold):     ~67 ms   (full fixpoint, no cache)
-Dep query (cache):    ~0 ms    (materialized view hit — 4000x faster)
-Parse (incremental):  ~21 ms   (views maintained live during parse)
-Dep query after parse: 0 ms    (already computed — beats grep)
-Rename + render 1:    < 0.1 ms (O(1))
-Render all 200:       ~3 ms
-Text grep:            ~0.1 ms
-```
-
-Run `racket engine-bench.rkt` to reproduce.
-
-At scale (100-function financial analytics codebase, E12):
-
-```
-100 functions, 5 layers, 2399 objects, 1672 claims
-Parse:                  37 ms
-fn-depends-on (245 edges): 0.1 ms  (matview hit)
-trans-dep (1655 pairs):    0.2 ms  (matview hit)
-Rename:                 0.1 ms     (+ automatic matview update)
-add-function! (incremental): 55 ms
-modify-function!:       584 ms     (retract + reparse + rematerialize)
-remove-function!:       199 ms
-```
-
-Beagle bridge (real language, E13):
-
-```
-9 forms (2 records, 7 typed functions), 565 objects, 384 claims
-Parse:                  2.3 ms
-fn-depends-on (7 edges): 1.7 ms  (cold)
-fn-depends-on (cache):   0 ms    (matview hit)
-trans-dep (15 pairs):    0 ms    (matview hit)
-Materialize:            15 ms
-Rename:                 0.04 ms  (propagates to 3 callers)
-Render all 9:           0.5 ms
-add-function!:          0.9 ms
-modify-function!+rename: 1.2 ms
-```
-
-Run `racket beagle-demo.rkt` to reproduce.
-
-Python bridge (E14):
-
-```
-9 forms (2 classes, 7 typed functions), 542 objects, 338 claims
-Parse:                  55 ms    (includes python3 subprocess)
-py-fn-depends-on (7 edges): 0 ms (matview hit)
-py-trans-dep (15 pairs):    0 ms (matview hit)
-Materialize:            8 ms
-Rename:                 0.03 ms  (propagates to 2 callers)
-Render all 9:           0.6 ms
-add-python-function!:   52 ms    (python3 subprocess dominates)
-modify-python-function!: 51 ms   (python3 subprocess dominates)
-```
-
-Run `racket python-demo.rkt` to reproduce.
-
-**Honest limitations:**
-- Materialization cost scales with output size. Rules producing O(N²)
-  tuples (shared-dep, hub-pair) can take seconds at N=100.
-- Incremental parse mutations trigger matview recomputation for
-  affected relations — modify-function! at 584ms is the worst case.
-- Dependency queries via Datalog are slower than grep for simple
-  cases. The structural advantage is correctness (guaranteed complete
-  transitive closure) and persistence (rules compose, matviews cache).
+| Doc | Contents |
+|-----|----------|
+| **[How CNF works](docs/overview.md)** | Concrete walkthrough — function as claims, rename, deps, agents |
+| **[API reference](docs/api.md)** | Kernel, Datalog, eval, schema, graph, lang layer APIs |
+| **[MCP server](docs/mcp.md)** | 30 tools, MCP Resources, workflows, daemon mode |
+| **[Language bridges](docs/bridges.md)** | Beagle and Python bridges, adding new languages |
+| **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
+| **[Specification](specification.md)** | Full formal spec |
+| **[Experiments](docs/experiments/)** | 15 experiments (E1–E15) with raw results |
+| **[Devlog](docs/devlog/)** | 17 entries — discoveries, direction changes, honest numbers |
+| **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests
 
 118 tests across 10 files:
 
+```bash
+racket cnf-test.rkt           # 11 kernel
+racket datalog-test.rkt       # 16 datalog (incl. incremental rule add/supersede)
+racket eval-test.rkt          # 6 evaluator
+racket demo-test.rkt          # 8 graph layer
+racket schema-test.rkt        # 10 schema
+racket lang-test.rkt          # 15 lang (incl. incremental parse)
+racket tx-test.rkt            # 16 transactions (incl. agent identity)
+racket rwlock-test.rkt        # 6 MVCC snapshot isolation
+racket beagle-lang-test.rkt   # 15 beagle bridge
+racket python-lang-test.rkt   # 15 python bridge
 ```
-racket cnf-test.rkt           # 11 kernel tests
-racket datalog-test.rkt       # 16 datalog tests (incl. incremental rule add/supersede)
-racket eval-test.rkt          # 6 evaluator tests
-racket demo-test.rkt          # 8 graph layer tests
-racket schema-test.rkt        # 10 schema layer tests
-racket lang-test.rkt          # 15 lang tests (incl. incremental parse)
-racket tx-test.rkt            # 16 transaction tests (incl. agent identity)
-racket rwlock-test.rkt        # 6 MVCC snapshot isolation tests
-racket beagle-lang-test.rkt   # 15 beagle bridge tests (parse, deps, rename, render)
-racket python-lang-test.rkt  # 15 python bridge tests (parse, deps, rename, render)
-```
+
+## Honest limitations
+
+- Materialization cost scales with output size. Rules producing O(N²)
+  tuples can take seconds at N=100.
+- `modify-function!` at 584ms worst case (retract + reparse + rematerialize).
+- Dependency queries via Datalog are slower than grep for simple cases.
+  The advantage is correctness (complete transitive closure) and
+  persistence (rules compose, matviews cache).
+- Python bridge adds ~50ms per operation from subprocess overhead.
+- Benchmarks are at 50–200 functions, not 50,000. The correctness
+  advantage is structural (entity references vs string matching) and
+  doesn't depend on scale, but performance at large scale is unproven.
+- History falls out naturally from supersession — it's cheap and
+  built in, but not zero-cost.

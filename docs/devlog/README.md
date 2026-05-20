@@ -23,3 +23,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 014 | 2026-05-20 | [Completing the roadmap](014-completing-the-roadmap.md) |
 | 015 | 2026-05-20 | [Beagle bridge: real language, real claim graph](015-beagle-bridge.md) |
 | 016 | 2026-05-20 | [Python bridge + MCP Resources + language-agnostic server](016-python-bridge-mcp-resources.md) |
+| 017 | 2026-05-20 | [Correctness, not speed](017-correctness-not-speed.md) |
