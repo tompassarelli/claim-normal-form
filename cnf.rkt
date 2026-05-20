@@ -37,6 +37,7 @@
          all-txs
          claims-since
          current-tx-seq
+         tx-agent
          claims-visible-as-of)
 
 ;; --- Context ---
@@ -244,12 +245,16 @@
   (ctx-set! 'tx-to-claims (make-hash))
   (ctx-set! 'tx-meta (make-hash)))
 
-(define (make-tx-entity!)
+(define (make-tx-entity! #:agent [agent #f])
   (define tx-id (fresh-id!))
   (define counter (ctx-ref 'tx-counter))
   (define seq (add1 (unbox counter)))
   (set-box! counter seq)
-  (hash-set! (ctx-ref 'tx-meta) tx-id (hasheq 'seq seq))
+  (define effective-agent (or agent (ctx-ref 'current-agent #f)))
+  (define meta (if effective-agent
+                   (hasheq 'seq seq 'agent effective-agent)
+                   (hasheq 'seq seq)))
+  (hash-set! (ctx-ref 'tx-meta) tx-id meta)
   tx-id)
 
 (define (restore-hash! target source)
@@ -293,12 +298,12 @@
   (restore-hash! (ctx-ref 'tx-meta) (hash-ref snap 'tx-meta))
   (set-box! (ctx-ref 'tx-counter) (hash-ref snap 'tx-counter)))
 
-(define (begin-tx!)
+(define (begin-tx! #:agent [agent #f])
   (define current (ctx-ref 'current-tx))
   (when (unbox current)
     (error 'begin-tx! "nested transactions not supported"))
   (ctx-set! 'tx-snapshot (make-rollback-snapshot))
-  (define tx-id (make-tx-entity!))
+  (define tx-id (make-tx-entity! #:agent agent))
   (set-box! current tx-id)
   (ctx-set! 'tx-pending-hooks '())
   (ctx-set! 'tx-suppress-hooks? #t)
@@ -334,8 +339,8 @@
   (ctx-set! 'tx-pending-hooks '())
   (ctx-set! 'tx-snapshot #f))
 
-(define (call-with-transaction thunk)
-  (begin-tx!)
+(define (call-with-transaction thunk #:agent [agent #f])
+  (begin-tx! #:agent agent)
   (with-handlers ([exn:fail? (lambda (e)
                     (rollback-tx!)
                     (raise e))])
@@ -379,6 +384,12 @@
 (define (current-tx-seq)
   (define counter (ctx-ref 'tx-counter #f))
   (if counter (unbox counter) 0))
+
+(define (tx-agent tx-id)
+  (define meta-h (ctx-ref 'tx-meta #f))
+  (and meta-h
+       (let ([meta (hash-ref meta-h tx-id #f)])
+         (and meta (hash-ref meta 'agent #f)))))
 
 (define (claims-visible-as-of tx-seq-num #:l [l #f] #:p [p #f] #:r [r #f])
   (define ctx (current-ctx))
@@ -439,7 +450,10 @@
                   '())
    'tx-meta (if meta-h
                 (for/list ([(tx meta) (in-hash meta-h)])
-                  (list tx (hash-ref meta 'seq)))
+                  (define agent (hash-ref meta 'agent #f))
+                  (if agent
+                      (list tx (hash-ref meta 'seq) agent)
+                      (list tx (hash-ref meta 'seq))))
                 '())))
 
 (define (import-store! data)
@@ -470,7 +484,11 @@
        (hash-set! c2tx (first pair) (second pair))
        (hash-update! t2c (second pair) (lambda (old) (cons (first pair) old)) '()))
      (for ([entry (in-list (hash-ref data 'tx-meta '()))])
-       (hash-set! meta-h (first entry) (hasheq 'seq (second entry))))]
+       (define agent (and (>= (length entry) 3) (third entry)))
+       (hash-set! meta-h (first entry)
+                  (if agent
+                      (hasheq 'seq (second entry) 'agent agent)
+                      (hasheq 'seq (second entry)))))]
     [else
      (define claim-list (hash-ref data 'claims '()))
      (unless (null? claim-list)

@@ -212,17 +212,63 @@ Every claim now belongs to a transaction. Transactions add:
 format v2 preserves tx data; v1 imports get a synthetic tx. 72 tests
 (13 new tx tests).
 
-## NEXT: Multi-Agent Concurrent Access
+## DONE: Multi-Agent Concurrent Access
 
-Daemon mode supports multiple TCP clients, but the experiment used
-sequential sessions. The next test: two agents building complementary
-understanding simultaneously on the same claim graph.
+Daemon mode supports multiple TCP clients. Three pieces completed:
 
-Agent A defines structural rules. Agent B defines quality rules.
-Agent C composes both. Text can't do this — there's no shared state.
+1. **Agent identity on transactions.** `set_agent` MCP tool sets
+   the current agent name. All subsequent claims (implicit or explicit
+   tx) are attributed. `tx_log` shows `agent: name`. Survives
+   serialization. 27 MCP tools (was 26).
+
+2. **E11: Multi-agent experiment.** Two agents on the same daemon
+   building complementary understanding. Agent A (structural-analyst)
+   defines trans-dep + shared-dep rules. Agent B (quality-checker)
+   restores, inspects Agent A's rules, defines high-impact rule
+   composing Agent A's derived relations. CNF 11 calls vs text ~8.
+   Text still wins count, but the scenario is structurally impossible
+   for text agents — no shared substrate to inherit or compose on.
+   Discovery: queries within atomic batches read pre-mutation derived
+   state (hooks deferred to commit). Results: `docs/experiments/e11-multi-agent/`.
+
+3. **Concurrency refinement.** Current semaphore serializes entire
+   requests — two simultaneous queries block each other. Fine for the
+   experiment (sequential agents, shared graph). True parallelism needs
+   read/write locking or MVCC. Not needed yet but could be a big unlock
+   for real multi-agent workflows.
+
+## LATER: Read/Write Locking or MVCC
+
+Replace the global semaphore with fine-grained concurrency control.
+Options:
+- **Read/write locks** — multiple readers, exclusive writer. Queries
+  run in parallel, mutations serialize. Simple but doesn't help when
+  multiple agents mutate simultaneously.
+- **MVCC (multi-version concurrency control)** — each tx sees a
+  consistent snapshot. Readers never block writers. Transactions built
+  on top of the existing tx-seq numbering. More complex but enables
+  truly concurrent multi-agent collaboration without serialization.
+
+This is a prerequisite for scaling beyond 2-3 agents on one daemon.
+
+## LATER: Incremental Parse
+
+The missing piece from E9. Currently, mutations require reset + full
+reparse, destroying accumulated rules. With incremental parse,
+mutations flow through the claim graph: add/remove/modify individual
+function claims without touching the rest. Matviews auto-update through
+the change. This is the scenario where CNF should decisively win over
+text — the agent edits code and the structural understanding updates
+live, no reparse needed.
 
 ## LATER: Real Codebase Demo
 
 Run the MCP server against a non-toy Racket project (50+ functions).
 Show the full workflow: parse, discover, define rules, refactor,
 evolve. Honest timing and capability assessment at real scale.
+
+## LATER: Package for External Use
+
+Ship the MCP server as a standalone tool other projects can point
+Claude Code at. Needs: installation instructions, configuration,
+documentation of the 26 tools, example workflows.

@@ -188,5 +188,44 @@
   (check-true (< s1 s2))
   (displayln "PASS 13 — current-tx-seq advances monotonically"))
 
+;; 14. Agent identity on transactions
+(reset-store!)
+(let* ([a (entity!)]
+       [p (entity!)]
+       [b (entity!)]
+       [c1 (claim! a p b)])
+  (check-false (tx-agent (claim-tx c1)))
+  (ctx-set! 'current-agent "agent-A")
+  (define c2 (claim! a p a))
+  (check-equal? (tx-agent (claim-tx c2)) "agent-A")
+  (ctx-set! 'current-agent #f)
+  (displayln "PASS 14 — agent identity on implicit txs"))
+
+;; 15. Agent identity on explicit transactions
+(reset-store!)
+(let* ([a (entity!)]
+       [p (entity!)]
+       [b (entity!)])
+  (define tx (begin-tx! #:agent "agent-B"))
+  (claim! a p b)
+  (commit-tx!)
+  (check-equal? (tx-agent tx) "agent-B")
+  (displayln "PASS 15 — agent identity on explicit txs"))
+
+;; 16. Agent identity survives serialization round-trip
+(reset-store!)
+(ctx-set! 'current-agent "agent-C")
+(let* ([a (entity!)]
+       [p (entity!)]
+       [b (entity!)]
+       [c (claim! a p b)]
+       [tx (claim-tx c)]
+       [data (export-store)])
+  (ctx-set! 'current-agent #f)
+  (current-ctx (make-blank-ctx))
+  (import-store! data)
+  (check-equal? (tx-agent tx) "agent-C")
+  (displayln "PASS 16 — agent identity survives serialization"))
+
 (displayln "")
 (displayln "All tx tests passed.")

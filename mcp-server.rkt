@@ -501,7 +501,19 @@
     'description (string-append
       "Return the latest transaction sequence number. Save this value, then later call "
       "tx_log with since_seq to see what changed since you last checked.")
-    'inputSchema (hasheq 'type "object" 'properties (hasheq)))))
+    'inputSchema (hasheq 'type "object" 'properties (hasheq)))
+
+   (hasheq
+    'name "set_agent"
+    'description (string-append
+      "Identify this agent. All subsequent operations (claims, rules, queries) will be "
+      "attributed to this agent name in the transaction log. Call once at session start.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'name (hasheq 'type "string"
+                      'description "Agent identifier (e.g. 'structural-analyst', 'quality-checker')"))
+      'required '("name")))))
 
 ;; --- Tool handlers ---
 
@@ -771,7 +783,8 @@
              (format "[~a] ~a:\n~a" i tool-name result))))
      (define results
        (if atomic?
-           (call-with-transaction (lambda () (execute-batch)))
+           (call-with-transaction (lambda () (execute-batch))
+                                  #:agent (ctx-ref 'current-agent #f))
            (execute-batch)))
      (string-join results "\n\n")]
 
@@ -817,12 +830,21 @@
                         (if (> since 0) (format " (since seq ~a)" since) ""))
                 (for/list ([tx (in-list limited)])
                   (define seq (tx-seq tx))
+                  (define agent (tx-agent tx))
                   (define cids (tx-claims tx))
-                  (format "  tx ~a (seq ~a): ~a claim(s)" tx seq (length cids))))
+                  (format "  tx ~a (seq ~a~a): ~a claim(s)"
+                          tx seq
+                          (if agent (format ", agent: ~a" agent) "")
+                          (length cids))))
           "\n"))]
 
     [("current_tx_seq")
      (format "~a" (current-tx-seq))]
+
+    [("set_agent")
+     (define agent-name (hash-ref arguments 'name))
+     (ctx-set! 'current-agent agent-name)
+     (format "Agent identity set to '~a'. All subsequent operations will be attributed to this agent." agent-name)]
 
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))

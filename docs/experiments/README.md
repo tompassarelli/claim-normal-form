@@ -17,6 +17,7 @@ a maintained semantic index than against text files.
 | E8 | New interface arena | [results](e8-new-interface/results.md) | CNF 32→14 calls. Text also evolved: 12→3. Text wins 4.7x. |
 | E9 | Evolving codebase | [results](e9-evolving-codebase/results.md) | 50 fn, 7 tasks. CNF 10 vs text ~6. Gap narrows to 1.7x. |
 | E10 | Shared substrate | [results](e10-shared-substrate/results.md) | Cross-session persistence. CNF 6 vs text ~5. **Paradigm shift.** |
+| E11 | Multi-agent | [results](e11-multi-agent/results.md) | Two agents, shared graph. Cross-agent rule composition. **Text can't do this.** |
 
 ## The arc
 
@@ -50,3 +51,10 @@ results through a rename, and composed new rules on existing derived
 relations. The text agent reimplemented everything from scratch — and
 got answers wrong. At 1.2x, call count is noise. The differentiation
 is qualitative: what the agent CAN DO, not how many calls it takes.
+
+E11 pushed further: two agents on the same claim graph. Agent A
+defines structural rules, Agent B inherits them and defines quality
+rules that COMPOSE Agent A's derived relations. tx_log shows clean
+agent attribution. This is structurally impossible for text agents —
+there's no shared mutable substrate to inherit, compose on, or
+attribute through.

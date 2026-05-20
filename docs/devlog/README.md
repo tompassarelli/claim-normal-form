@@ -18,3 +18,5 @@ Each entry is a snapshot of understanding at the time it was written.
 | 009 | 2026-05-20 | [What the arenas actually proved (and didn't)](009-what-the-arenas-actually-proved.md) |
 | 010 | 2026-05-20 | [The shared substrate: persistence changes the game](010-shared-substrate.md) |
 | 011 | 2026-05-20 | [Datomic-inspired transactions](011-transactions.md) |
+| 012 | 2026-05-20 | [Scaling agent cognition — a shower thought](012-scaling-agent-cognition.md) |
+| 013 | 2026-05-20 | [Multi-agent collaboration — what the experiment showed](013-multi-agent-results.md) |
