@@ -391,6 +391,55 @@ racket mcp-server.rkt --connect 7888
 racket mcp-server.rkt --connect 7888
 ```
 
+## Beagle Integration (`beagle-lang.rkt`)
+
+Bridge from [beagle](https://github.com/tompassarelli/beagle) (typed
+Lisp, 50+ forms, 6 emit targets) to the CNF claim graph. Beagle's
+existing parser produces AST structs; the bridge walks them into
+entities and claims.
+
+```racket
+(require "cnf.rkt" "datalog.rkt" "eval.rkt" "graph.rkt" "beagle-lang.rkt")
+
+(reset-store!)
+(setup-eval!)
+(setup-graph!)
+(setup-beagle-lang!)
+
+;; Parse beagle source into claims
+(define fns (parse-beagle-program! "
+(defrecord Trade [(symbol : String) (qty : Int) (price : Float)])
+
+(defn trade-value [(t : Trade)] : Float
+  (* (trade-qty t) (trade-price t)))
+
+(defn portfolio-total [(p : Portfolio)] : Float
+  (reduce + 0.0 (mapv trade-value (portfolio-trades p))))
+"))
+
+;; Query cross-function dependencies (derived by Datalog)
+(query (fn-depends-on (? caller) (? callee)))
+;; => portfolio-total -> trade-value
+
+;; Rename: one claim, zero find-replace
+(rename! (first fns) "compute-trade-value")
+(render-beagle-program fns)
+;; => portfolio-total's call site says "compute-trade-value"
+
+;; Incremental edit (no reparse)
+(add-beagle-function! "(defn net-value [(t : Trade)] : Float
+  (- (compute-trade-value t) 0.01))")
+```
+
+30+ beagle form types handled: defn, defrecord, def, call, if, if-let,
+let, fn, match, cond, when, do, for, loop, try, vec, map, method-call,
+kw-access, and more. 18 predicates. Run `racket beagle-demo.rkt` for
+the full demonstration.
+
+The MCP server operates on beagle source by default — `parse_program`,
+`render`, `rename`, `add_function`, `modify_function`, `remove_function`
+all use the beagle bridge.
+
 ## Performance
 
 The Datalog engine uses **semi-naive evaluation** with
@@ -438,6 +487,23 @@ modify-function!:       584 ms     (retract + reparse + rematerialize)
 remove-function!:       199 ms
 ```
 
+Beagle bridge (real language, E13):
+
+```
+9 forms (2 records, 7 typed functions), 565 objects, 384 claims
+Parse:                  2.3 ms
+fn-depends-on (7 edges): 1.7 ms  (cold)
+fn-depends-on (cache):   0 ms    (matview hit)
+trans-dep (15 pairs):    0 ms    (matview hit)
+Materialize:            15 ms
+Rename:                 0.04 ms  (propagates to 3 callers)
+Render all 9:           0.5 ms
+add-function!:          0.9 ms
+modify-function!+rename: 1.2 ms
+```
+
+Run `racket beagle-demo.rkt` to reproduce.
+
 **Honest limitations:**
 - Materialization cost scales with output size. Rules producing O(N²)
   tuples (shared-dep, hub-pair) can take seconds at N=100.
@@ -449,15 +515,16 @@ remove-function!:       199 ms
 
 ## Tests
 
-88 tests across 8 files:
+103 tests across 9 files:
 
 ```
-racket cnf-test.rkt      # 11 kernel tests
-racket datalog-test.rkt  # 16 datalog tests (incl. incremental rule add/supersede)
-racket eval-test.rkt     # 6 evaluator tests
-racket demo-test.rkt     # 8 graph layer tests
-racket schema-test.rkt   # 10 schema layer tests
-racket lang-test.rkt     # 15 lang tests (incl. incremental parse)
-racket tx-test.rkt       # 16 transaction tests (incl. agent identity)
-racket rwlock-test.rkt   # 6 read/write lock tests
+racket cnf-test.rkt           # 11 kernel tests
+racket datalog-test.rkt       # 16 datalog tests (incl. incremental rule add/supersede)
+racket eval-test.rkt          # 6 evaluator tests
+racket demo-test.rkt          # 8 graph layer tests
+racket schema-test.rkt        # 10 schema layer tests
+racket lang-test.rkt          # 15 lang tests (incl. incremental parse)
+racket tx-test.rkt            # 16 transaction tests (incl. agent identity)
+racket rwlock-test.rkt        # 6 MVCC snapshot isolation tests
+racket beagle-lang-test.rkt   # 15 beagle bridge tests (parse, deps, rename, render)
 ```

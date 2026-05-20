@@ -19,6 +19,7 @@ a maintained semantic index than against text files.
 | E10 | Shared substrate | [results](e10-shared-substrate/results.md) | Cross-session persistence. CNF 6 vs text ~5. **Paradigm shift.** |
 | E11 | Multi-agent | [results](e11-multi-agent/results.md) | Two agents, shared graph. Cross-agent rule composition. **Text can't do this.** |
 | E12 | Real demo | [results](e12-real-demo/results.md) | 100 fns, full workflow: parse→rules→refactor→evolve. Incremental parse works. |
+| E13 | Beagle bridge | [results](e13-beagle-bridge/results.md) | Real language (30+ form types). Parse→deps→rename→edit works end-to-end. |
 
 ## The arc
 

@@ -291,3 +291,81 @@ README updated with full MCP server documentation:
   persistence, multi-agent collaboration)
 - Updated performance numbers from E12 (100-function codebase)
 - Updated test counts (88 tests across 8 files)
+
+## DONE: Beagle Integration (Bridge Module)
+
+`beagle-lang.rkt` — bridge from beagle's parser to CNF's claim graph.
+Parses real beagle source via `(require beagle/private/parse)`, walks
+AST structs, creates entities and claims. Beagle doesn't change.
+
+Claim mapping implemented:
+- `defn-form` → function entity + typed params + return type + body
+- `defn-multi` → function entity (first arity) + arity count
+- `def-form` → binding entity + type + value expression
+- `defrecord` → record entity + typed fields with positions
+- `call-form` → calls predicate (resolves to function entities)
+- `if-form` → condition/then/else with has-child traversal
+- `let-form` → bindings with scope, has-child traversal
+- `fn-form` → anonymous function with params and body
+- `match-form`, `cond-form`, `when-form`, `do-form` → has-child
+- `for-form`, `loop-form`, `try-form` → has-child traversal
+- `method-call`, `kw-access` → calls predicate
+- `vec-form`, `map-form` → collection with children
+- Other forms → entity with form-kind claim
+
+18 predicates. Datalog rules: `contains-call` walks `has-child`
+transitively, `fn-depends-on` derived from body + contains-call.
+
+Rendering reconstructs beagle syntax from claims: typed params,
+return types, call expressions, if/let/do/fn forms. Rename propagates
+automatically through entity references.
+
+Incremental operations: `add-beagle-function!`, `remove-beagle-function!`,
+`modify-beagle-function!`. Same pattern as toy lang but walks beagle AST.
+
+`parse-beagle-file!` reads `.bgl`/`.bclj` files directly (strips
+`#lang` line automatically).
+
+Upstream fix: `resolve-symbol` in cnf.rkt now checks both
+`symbol-predicate-id` (kernel naming) and `name-pred` (graph naming),
+with supersession filtering. Was a latent bug — entities named via
+`give-name!` were invisible to `resolve-symbol`.
+
+Tested against beagle's `examples/demo.bclj` (15 forms, records,
+unions, enums, multi-arity, threading, match). 381 objects, 220 claims,
+cross-function dependencies detected.
+
+15 beagle-lang tests. 103 tests total across 9 files.
+
+MCP server wired to beagle-lang: `parse_program`, `render`, `rename`,
+`add_function`, `remove_function`, `modify_function` all use beagle's
+parser and claim mapping. `fn-depends-on` rule filtered to form-kind
+"defn" for accurate function-to-function dependencies.
+
+## DONE: E13 — Beagle Bridge Demo
+
+9-form financial analytics program in real beagle syntax (2 records,
+7 functions with types, generics, if-let, let, fn, match). Parse 2.3ms →
+565 objects, 384 claims. 7 direct deps, 15 transitive pairs.
+
+Full workflow: parse → discover (fn-depends-on) → custom rules (trans-dep) →
+materialize (15ms) → rename (0.04ms, propagates to 3 callers) → incremental
+edit (add 0.9ms, modify+rename 1.2ms) → render round-trip.
+
+30+ beagle form types handled in expression walker. Renderer reconstructs
+typed params, return types, records, if/if-let, let, fn, match, call
+expressions. Run `racket beagle-demo.rkt` to reproduce.
+
+Results: `docs/experiments/e13-beagle-bridge/`.
+
+## LATER: Concurrent Writers (Multi-Writer MVCC)
+
+Current MVCC gives snapshot isolation for reads with serialized writes.
+True multi-writer MVCC would allow multiple agents to mutate the claim
+graph simultaneously, each seeing a consistent snapshot, with conflict
+detection on commit.
+
+Requires: write-set tracking per transaction, conflict detection
+(overlapping write sets → abort), retry logic. The existing tx-seq
+numbering is the foundation. Not needed until multiple agents are
+actively mutating the same codebase in parallel.

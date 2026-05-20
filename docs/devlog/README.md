@@ -21,3 +21,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 012 | 2026-05-20 | [Scaling agent cognition — a shower thought](012-scaling-agent-cognition.md) |
 | 013 | 2026-05-20 | [Multi-agent collaboration — what the experiment showed](013-multi-agent-results.md) |
 | 014 | 2026-05-20 | [Completing the roadmap](014-completing-the-roadmap.md) |
+| 015 | 2026-05-20 | [Beagle bridge: real language, real claim graph](015-beagle-bridge.md) |

@@ -179,10 +179,21 @@
   (define ctx (current-ctx))
   (define vid (value-id sym))
   (and vid
-       (let ([cids (hash-ref (cnf-ctx-idx-by-pr ctx)
-                              (cons (symbol-predicate-id) vid) '())])
-         (and (not (null? cids))
-              (claim-rec-l (hash-ref (cnf-ctx-claims ctx) (first cids)))))))
+       (let* ([spid (symbol-predicate-id)]
+              [cids (hash-ref (cnf-ctx-idx-by-pr ctx)
+                              (cons spid vid) '())]
+              [live (filter (lambda (cid) (not (superseded? cid))) cids)])
+         (cond
+           [(not (null? live))
+            (claim-rec-l (hash-ref (cnf-ctx-claims ctx) (first live)))]
+           [else
+            (define npid (hash-ref (cnf-ctx-ext ctx) 'name-pred #f))
+            (and npid
+                 (let* ([ncids (hash-ref (cnf-ctx-idx-by-pr ctx)
+                                         (cons npid vid) '())]
+                        [nlive (filter (lambda (cid) (not (superseded? cid))) ncids)])
+                   (and (not (null? nlive))
+                        (claim-rec-l (hash-ref (cnf-ctx-claims ctx) (first nlive))))))]))))
 
 (define (resolve-value id)
   (hash-ref (cnf-ctx-values (current-ctx)) id #f))

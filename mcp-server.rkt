@@ -12,7 +12,7 @@
          "eval.rkt"
          "graph.rkt"
          "schema.rkt"
-         "lang.rkt")
+         "beagle-lang.rkt")
 
 ;; --- Transport ---
 
@@ -39,7 +39,7 @@
   (setup-graph!)
   (setup-schema!)
   (setup-rule-predicates!)
-  (setup-lang!)
+  (setup-beagle-lang!)
   (materialize!))
 
 (define default-checkpoint-path
@@ -48,6 +48,7 @@
 ;; --- Restore from checkpoint ---
 
 (define (register-builtin-rules!)
+  ;; Eval-layer rules (operand resolution, readiness, dependency tracking)
   (define-rule (operand-val (? operand) (? operand))
     (value (? operand) (? _lit)))
   (define-rule (operand-val (? operand) (? result-val))
@@ -70,21 +71,8 @@
   (define-rule (affected (? x) (? changed))
     (expr-depends-on (? x) (? y))
     (affected (? y) (? changed)))
-  (define bp (body-pred))
-  (define cp (calls-pred))
-  (define lp (left-pred))
-  (define rp (right-pred))
-  (define-rule (contains-call (? expr) (? fn))
-    (current-triple (? expr) cp (? fn)))
-  (define-rule (contains-call (? expr) (? fn))
-    (current-triple (? expr) lp (? child))
-    (contains-call (? child) (? fn)))
-  (define-rule (contains-call (? expr) (? fn))
-    (current-triple (? expr) rp (? child))
-    (contains-call (? child) (? fn)))
-  (define-rule (fn-depends-on (? caller) (? callee))
-    (current-triple (? caller) bp (? body))
-    (contains-call (? body) (? callee)))
+  ;; Beagle-lang rules: contains-call and fn-depends-on are registered
+  ;; by setup-beagle-lang! using has-child traversal
   (void))
 
 (define (restore-workspace! data)
@@ -108,6 +96,20 @@
   (find-pred "position" 'position-pred)
   (find-pred "body" 'body-pred)
   (find-pred "calls" 'calls-pred)
+  (find-pred "has-type" 'has-type-pred)
+  (find-pred "return-type" 'return-type-pred)
+  (find-pred "expr-kind" 'expr-kind-pred)
+  (find-pred "has-arg" 'has-arg-pred)
+  (find-pred "has-child" 'has-child-pred)
+  (find-pred "has-field" 'has-field-pred)
+  (find-pred "form-kind" 'form-kind-pred)
+  (find-pred "is-private" 'is-private-pred)
+  (find-pred "has-binding" 'has-binding-pred)
+  (find-pred "binding-value" 'binding-value-pred)
+  (find-pred "has-condition" 'has-condition-pred)
+  (find-pred "has-then" 'has-then-pred)
+  (find-pred "has-else" 'has-else-pred)
+  (find-pred "rest-param" 'rest-param-pred)
   (find-pred "rule-head-rel" 'rule-head-rel-pred-id)
   (find-pred "rule-source" 'rule-source-pred-id)
 
@@ -399,7 +401,7 @@
    ;; Lang
    (hasheq
     'name "parse_program"
-    'description "Parse source text (CNF mini-language) into the claim graph. Returns function entity IDs."
+    'description "Parse beagle source into the claim graph. Handles defn, def, defrecord, and expressions. Returns entity IDs with form types. Strips #lang line automatically."
     'inputSchema (hasheq
       'type "object"
       'properties (hasheq
@@ -526,7 +528,7 @@
       'type "object"
       'properties (hasheq
         'source (hasheq 'type "string"
-                        'description "Function definition, e.g. (defn foo (x y) (+ x y))"))
+                        'description "Beagle function definition, e.g. (defn foo [(x : Int)] : Int (+ x 1))"))
       'required '("source")))
 
    (hasheq
@@ -554,7 +556,7 @@
         'name (hasheq 'type "string"
                       'description "Name of the function to modify")
         'source (hasheq 'type "string"
-                        'description "New function definition, e.g. (defn foo (x y z) (* x (+ y z)))"))
+                        'description "New beagle function definition, e.g. (defn foo [(x : Int) (y : Int)] : Int (* x y))"))
       'required '("name" "source")))))
 
 ;; --- Tool handlers ---
@@ -740,40 +742,34 @@
 
     [("parse_program")
      (define source (hash-ref arguments 'source))
-     (define fns (parse-program! source))
-     (define fn-lines
+     (define fns (parse-beagle-program! source))
+     (define form-lines
        (for/list ([f (in-list fns)])
-         (format "  ~a: ~a" f (render-ref f))))
-     (define schema-names
-       '(("op" op-pred) ("left" left-pred) ("right" right-pred)
-         ("name" name-pred) ("body" body-pred) ("calls" calls-pred)
-         ("has-param" has-param-pred) ("position" position-pred)
-         ("symbol" symbol-predicate-id) ("supersedes" supersedes-pred)))
+         (define kind-cs (current-claims-where #:l f #:p (form-kind-pred)))
+         (define kind (and (not (null? kind-cs))
+                          (resolve-value (list-ref (first kind-cs) 3))))
+         (format "  ~a: ~a (~a)" f (render-ref f) (or kind "?"))))
+     (define schema-accessors
+       `(("name" ,(name-pred)) ("body" ,(body-pred)) ("calls" ,(calls-pred))
+         ("has-param" ,(has-param-pred)) ("position" ,(position-pred))
+         ("has-type" ,(has-type-pred)) ("return-type" ,(return-type-pred))
+         ("expr-kind" ,(expr-kind-pred)) ("has-arg" ,(has-arg-pred))
+         ("has-child" ,(has-child-pred)) ("has-field" ,(has-field-pred))
+         ("form-kind" ,(form-kind-pred)) ("is-private" ,(is-private-pred))
+         ("has-binding" ,(has-binding-pred)) ("binding-value" ,(binding-value-pred))
+         ("has-condition" ,(has-condition-pred)) ("has-then" ,(has-then-pred))
+         ("has-else" ,(has-else-pred)) ("rest-param" ,(rest-param-pred))
+         ("symbol" ,(symbol-predicate-id)) ("supersedes" ,(supersedes-pred))))
      (define schema-lines
-       (for/list ([pair (in-list schema-names)])
-         (define name (first pair))
-         (define accessor (second pair))
-         (define id
-           (with-handlers ([exn:fail? (lambda (_) #f)])
-             (case accessor
-               [(op-pred) (op-pred)]
-               [(left-pred) (left-pred)]
-               [(right-pred) (right-pred)]
-               [(name-pred) (name-pred)]
-               [(body-pred) (body-pred)]
-               [(calls-pred) (calls-pred)]
-               [(has-param-pred) (has-param-pred)]
-               [(position-pred) (position-pred)]
-               [(symbol-predicate-id) (symbol-predicate-id)]
-               [(supersedes-pred) (supersedes-pred)])))
-         (format "  ~a: ~a" name (or id "?"))))
+       (for/list ([pair (in-list schema-accessors)])
+         (format "  ~a: ~a" (first pair) (second pair))))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
      (string-join
       (append
-       (list (format "Parsed ~a function(s) (~a objects, ~a claims):"
+       (list (format "Parsed ~a form(s) (~a objects, ~a claims):"
                      (length fns) obj-count claim-count))
-       fn-lines
+       form-lines
        (list "" "Schema (predicate name -> ID, usable as bare symbols in queries):")
        schema-lines
        (list "" "Built-in derived relations (already materialized):"
@@ -787,8 +783,8 @@
     [("render")
      (define ids (hash-ref arguments 'ids))
      (if (= (length ids) 1)
-         (render-fn (first ids))
-         (render-program ids))]
+         (render-beagle-fn (first ids))
+         (render-beagle-program ids))]
 
     [("rename")
      (define id (hash-ref arguments 'id))
@@ -890,7 +886,7 @@
 
     [("add_function")
      (define source (hash-ref arguments 'source))
-     (define fn-id (add-function! source))
+     (define fn-id (add-beagle-function! source))
      (define fn-name (render-ref fn-id))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
@@ -899,7 +895,7 @@
 
     [("remove_function")
      (define fn-name (hash-ref arguments 'name))
-     (define fn-id (remove-function! fn-name))
+     (define fn-id (remove-beagle-function! fn-name))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
      (format "Removed function ~a (id: ~a). Claims invalidated. Graph: ~a objects, ~a claims."
@@ -908,7 +904,7 @@
     [("modify_function")
      (define fn-name (hash-ref arguments 'name))
      (define source (hash-ref arguments 'source))
-     (define fn-id (modify-function! fn-name source))
+     (define fn-id (modify-beagle-function! fn-name source))
      (define new-name (render-ref fn-id))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
