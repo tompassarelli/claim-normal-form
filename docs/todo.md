@@ -410,6 +410,17 @@ CNF correct on all 5. Grep wrong on all 5:
 This is the experiment the reviewer asked for: not speed, correctness.
 Results: `docs/experiments/e15-correctness/`.
 
+## NOW: E16 — Agent Grounding Evaluation
+
+Harness built. 4-module Python codebase (45 functions, 26 tests),
+10 tasks with ground truth, hidden test suite for automated scoring.
+
+CNF baseline computed: 23 functions affected by round_cents, 25 in
+full_report's tree, 10 uncalled functions. Need to run actual agent
+sessions (text vs CNF) and record results.
+
+See `experiments/e16-agent-grounding/`.
+
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
 Current MVCC gives snapshot isolation for reads with serialized writes.

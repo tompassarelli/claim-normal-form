@@ -70,7 +70,9 @@
 ;; --- Parse Python via AST helper ---
 
 (define python-helper-path
-  (path->string (build-path (current-directory) "python-ast-helper.py")))
+  (let ([src (variable-reference->module-path-index (#%variable-reference))])
+    (define resolved (resolved-module-path-name (module-path-index-resolve src)))
+    (path->string (build-path (path-only resolved) "python-ast-helper.py"))))
 
 (define (parse-python-source source)
   (define-values (proc stdout stdin stderr)
