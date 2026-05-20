@@ -24,6 +24,8 @@ a maintained semantic index than against text files.
 | E15 | Correctness eval | [results](e15-correctness/results.md) | **CNF correct on 5/5 tasks. Text search wrong on 5/5.** The payoff experiment. |
 | E16 | Agent grounding | [results](e16-agent-grounding/results.md) | **CNF correct on 7/7 structural tasks. Text search wrong on 5, unprovable on 2.** |
 | E17 | Agent-in-the-loop | [results](e17-agent-in-the-loop/results.md) | **CNF 30/30, text 26/30. Both pass all tests — difference is in API contracts.** |
+| E18 | Real baseline | [results](e18-real-baseline/results.md) | **Rope ties CNF 30/30. Regex 26/30. Substrate properties: 5/5 (rope: N/A).** |
+| E19 | Coordination cost | [results](e19-coordination/results.md) | **5 agents, 45 fns. Git rediscovery 56% (50 ops). CNF 0%. Git rename breaks downstream edit.** |
 
 ## The arc
 
@@ -91,3 +93,29 @@ text 26/30 (87%). The text agent renames dict keys alongside function
 calls and misses dead code whose names appear as dict keys. CI can't
 catch this — the failure is in downstream contracts the tests don't
 cover.
+
+E18 answered the obvious rebuttal: regex is a strawman. Python's
+`rope` library does scope-aware rename and reference-counting — a
+real semantic tool. Result: rope ties CNF at 30/30 on all four tasks.
+The E17 advantage over regex was real but not unique. However, Part B
+tested substrate properties: cross-session rename propagation, Datalog
+rule persistence, cross-agent composition. 5/5 pass for CNF. Rope
+gets N/A by construction — no persistent state, no rule engine, no
+cross-session memory. The honest positioning: CNF doesn't beat rope
+at Python refactoring. It provides a persistent semantic substrate
+that survives sessions, spans languages, and lets agents compose
+derived knowledge.
+
+E19 shifted the frame entirely. The question is no longer "which tool
+renames better?" but "how much do agents waste rediscovering what
+prior agents already knew?" Five agents, 45-function codebase, six
+modules. Architect maps structure, Renamer renames, Janitor removes
+dead code, Feature dev adds a parameter, Auditor verifies. In git,
+every agent re-reads every file — 56% of all discovery is redundant
+(50 operations wasted). In CNF, each agent restores one checkpoint
+and inherits all prior agents' accumulated knowledge — 0% rediscovery.
+Bonus finding: git's naive rename breaks Agent D's downstream edit
+(tax exemption silently not applied). CNF distinguishes the function
+entity from the parameter entity, so the edit succeeds. The graph is
+shared working memory: program facts, derived relations, agent actions,
+and composable rules all persist and compound across sessions.

@@ -1,6 +1,6 @@
 # Claim Normal Form
 
-A semantic working copy for coding agents.
+A structural reasoning scaffold for coding agents.
 
 Instead of treating source code as text, CNF treats it as claims about
 stable identities. A function is not the string `"add"`. It is an
@@ -12,55 +12,103 @@ new claim, not a repository-wide string edit.
 a function becomes claims, why rename is O(1), and what this means for
 agents.
 
-## The tests passed. The edit was wrong.
+## The problem
 
-[E17](docs/experiments/e17-agent-in-the-loop/results.md) compares two
-agents making code changes on the same 45-function Python codebase.
+Coding agents work on text. Their understanding of a program — which
+functions exist, what calls what, what depends on what — is private
+cognition that dies when the session ends. The next agent starts from
+scratch: re-reads every file, re-greps every symbol, re-derives every
+dependency. This isn't a performance problem. It's a correctness
+problem.
 
-Both agents passed the visible 26-test suite on every task. But hidden
-API-contract tests exposed the difference:
+When Agent A renames a function via regex, it also renames unrelated
+parameters that happen to share the name. Agent B arrives later to add
+a feature, but Agent A's rename silently changed the code Agent B's
+edit targets — the edit fails silently, the test suite doesn't catch
+it, and nobody knows until production.
 
-| Agent workspace | Visible tests | Hidden contract tests |
-|---|---:|---:|
-| CNF-backed agent | 26/26 on every task | **30/30 (100%)** |
-| Text-backed agent | 26/26 on every task | **26/30 (87%)** |
+Text-based coordination shares *artifacts*. It doesn't share
+*understanding*. Every agent reasons alone, from scratch, against
+strings.
 
-The failures were structural: the text-backed agent renamed dictionary
-keys along with function calls, and missed dead code whose names
-appeared in data keys. CI stayed green because the visible tests did
-not cover downstream API contracts. CNF avoided those errors because
-references point to stable entities, not matching strings.
+## What CNF provides
 
-On local code changes, both approaches tied. CNF is not magic sauce for
-all programming. It wins specifically on structural tasks: rename
-safety, dead code removal, dependency-aware edits, and API-contract
-preservation.
+CNF gives agents a shared structural model of the program that
+persists while the program changes. The model has four layers:
 
-### The proof stack
+1. **Program facts** — "function A calls B", "entity X has parameter
+   Y." Produced by parsing source into the claim graph.
+2. **Derived facts** — "A transitively depends on C", "X is dead
+   code." Produced by Datalog rules, materialized and cached.
+3. **Agent actions** — "Agent A renamed this entity", "Agent B removed
+   that function." Recorded in the transaction log.
+4. **Composable rules** — Agent B defines new rules that compose on
+   Agent A's derived relations. Knowledge compounds across sessions.
 
-- [E15](docs/experiments/e15-correctness/results.md): CNF answers
-  structural queries correctly; text search does not.
-- [E16](docs/experiments/e16-agent-grounding/results.md): CNF handles
-  structural tasks correctly (7/7); text search is wrong or unprovable
-  (7/7).
-- [E17](docs/experiments/e17-agent-in-the-loop/results.md): CNF-backed
-  agents make more correct structural edits; text-backed agents pass CI
-  while breaking hidden contracts.
+This is the same value proposition as a type system: not "catch trivial
+errors" but "give the agent a stable model to reason against while the
+program is changing." A type checker prevents invalid compositions
+during construction. CNF prevents invalid coordination during
+collaboration — rename only the function entity, not the parameter
+entity. Identify dead code by entity references, not string matching.
+Know the blast radius of a change before making it.
 
-### Cross-session memory
+## Evidence
 
-Every agent session wakes up with amnesia and re-derives the project
-from text. CNF's rules, derived facts, transactions, and agent actions
-are all claims in the graph. A second agent restores the first agent's
-semantic work instead of rebuilding context from files. Rename
-propagates through the restored graph automatically.
+[E19](docs/experiments/e19-coordination/results.md) puts five agents
+on a 45-function codebase (6 modules). Each agent has a real task:
+map structure, rename a function, remove dead code, add a feature,
+audit the result.
 
-This is structurally impossible with text tools — there is no shared
-semantic substrate to persist, inherit, or compose on. E16 task 10
-scores 10/10 for CNF and 0/10 for text.
+| | Git | CNF |
+|--|---:|---:|
+| Total discoveries | 89 | 6 |
+| Wasted on rediscovery | **50 (56%)** | **0 (0%)** |
+| Dead code correctly identified | 5/7 | 7/7 |
+| Downstream edit silently broken | yes | no |
 
-See the full [experiment arc](docs/experiments/README.md) (17
-experiments, E1–E17).
+The rediscovery numbers matter, but the correctness failures matter
+more. In the git condition:
+
+- **Regex rename damages downstream work.** Agent B renames function
+  `subtotal` → `compute_subtotal` via `\bsubtotal\b`. This also
+  renames the `subtotal` *parameter* in an unrelated function. Agent D
+  later tries to modify that function — the edit fails silently because
+  the parameter name no longer matches. The test suite passes. Nobody
+  notices.
+
+- **Dead code detection gets false positives.** Grepping for function
+  names finds string matches in dict keys and comments. Agent C keeps
+  2 dead functions alive because their names appear in unrelated
+  contexts. CNF checks entity references: zero false positives.
+
+In the CNF condition, Agent B renames the function *entity* — one name
+claim. The parameter entity (a different object that happens to share
+the name) is untouched. Agent D's edit succeeds. Agent C queries
+callers via the materialized dependency graph: 7/7 dead functions
+identified. Each agent inherits all prior agents' structural knowledge
+via one checkpoint restore.
+
+Both conditions pass the same 26 tests. The difference is in
+structural correctness that the test suite can't cover.
+
+### The experiment arc
+
+19 experiments tracked the evolution from speed benchmarks to
+structural correctness to multi-agent coordination. The key
+inflection points:
+
+- **E15–E16**: CNF answers structural queries correctly (entity
+  resolution, transitive closure, shadowed names). Text search gets
+  them wrong. Not faster — *correct*.
+- **E17–E18**: Both agents pass all tests. CNF gets 30/30 hidden
+  contract tests; text gets 26/30. Rope (real semantic tool) ties
+  CNF on single-language rename, but provides no persistent state,
+  no rule engine, no cross-session memory.
+- **E19**: Shared structural model eliminates redundant work *and*
+  prevents cascading correctness failures across agents.
+
+See the full [experiment arc](docs/experiments/README.md) (E1–E19).
 
 ## Architecture
 
@@ -88,12 +136,10 @@ cnf/
   info.rkt             Meta package — (define implies '("cnf-lib"))
 ```
 
-Three language bridges prove the pattern is language-agnostic. The
-Racket bridge is minimal (define, struct, let, lambda, cond — no macro
-expansion). Adding a new language means writing a frontend that maps
-its AST into entities and claims. Dependency queries, rename
-propagation, history, MCP tools, and materialized views are shared
-infrastructure.
+Three language bridges prove the pattern is language-agnostic. Adding a
+new language means writing a frontend that maps its AST into entities
+and claims. Dependency queries, rename propagation, history, MCP tools,
+and materialized views are shared infrastructure.
 
 ## The ontology
 
@@ -147,22 +193,6 @@ Claude Code MCP configuration (`.claude/settings.json`):
 }
 ```
 
-CNF exposes the graph over MCP, so agents can parse programs, query
-dependencies, rename entities, define Datalog rules, checkpoint state,
-and resume across sessions — without rebuilding context from text.
-
-## Demos
-
-```bash
-python3 experiments/e17-agent-in-the-loop/run-eval.py  # E17: agent-in-the-loop, hidden tests
-racket experiments/e16-agent-grounding/run-eval.rkt    # E16: 10-task agent grounding eval
-racket e15-eval.rkt      # E15: correctness eval — CNF vs grep on 5 tasks
-racket python-demo.rkt   # E14: Python bridge — parse, deps, rename, incremental edit
-racket beagle-demo.rkt   # E13: Beagle bridge — real typed Lisp, full workflow
-racket lang-demo.rkt     # Toy language — thesis demonstration
-racket demo.rkt          # Graph layer — rename, dependency, incremental recompute
-```
-
 ## Documentation
 
 | Doc | Contents |
@@ -173,7 +203,7 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 17 experiments (E1–E17) with raw results |
+| **[Experiments](docs/experiments/)** | 19 experiments (E1–E19) with raw results |
 | **[Devlog](docs/devlog/)** | 20 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
@@ -187,15 +217,17 @@ raco test cnf-test/tests/     # run all
 
 ## Honest limitations
 
-- Materialization cost scales with output size. Rules producing O(N²)
-  tuples can take seconds at N=100.
-- `modify-function!` at 584ms worst case (retract + reparse + rematerialize).
-- Dependency queries via Datalog are slower than grep for simple cases.
-  The advantage is correctness (complete transitive closure) and
-  persistence (rules compose, matviews cache).
-- Python bridge adds ~50ms per operation from subprocess overhead.
 - Benchmarks are at 50–200 functions, not 50,000. The correctness
   advantage is structural (entity references vs string matching) and
   doesn't depend on scale, but performance at large scale is unproven.
-- History falls out naturally from supersession — it's cheap and
-  built in, but not zero-cost.
+- Materialization cost scales with output size. Rules producing O(N²)
+  tuples can take seconds at N=100.
+- `modify-function!` at 584ms worst case (retract + reparse +
+  rematerialize).
+- Python bridge adds ~50ms per operation from subprocess overhead.
+  Complex syntax (dicts, generators, f-strings) doesn't round-trip
+  through render.
+- Experiments use scripted agents, not LLM agents. The structural
+  advantages (entity precision, shared state, composable rules) are
+  architectural properties that don't depend on the agent
+  implementation, but real-agent validation is future work.

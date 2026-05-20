@@ -2,7 +2,7 @@
 
 (require "kernel.rkt" "datalog.rkt" "graph.rkt" json)
 
-(provide setup-python-lang!
+(provide setup-python-lang! restore-python-lang!
          parse-python-program! parse-python-file!
          add-python-function! remove-python-function! modify-python-function!
          render-python-program render-python-fn render-python-expr
@@ -66,6 +66,41 @@
     (py-contains-call (? body) (? callee))
     (current-triple (? callee) fkp defn-val))
   (void))
+
+(define (restore-python-lang!)
+  (define (find-pred name key)
+    (define id (resolve-symbol name))
+    (when id (ctx-set! key id)))
+  (find-pred "py-has-param" 'py-has-param-pred)
+  (find-pred "py-position" 'py-position-pred)
+  (find-pred "py-body" 'py-body-pred)
+  (find-pred "py-calls" 'py-calls-pred)
+  (find-pred "py-has-type" 'py-has-type-pred)
+  (find-pred "py-return-type" 'py-return-type-pred)
+  (find-pred "py-expr-kind" 'py-expr-kind-pred)
+  (find-pred "py-has-arg" 'py-has-arg-pred)
+  (find-pred "py-has-child" 'py-has-child-pred)
+  (find-pred "py-form-kind" 'py-form-kind-pred)
+  (find-pred "py-has-base" 'py-has-base-pred)
+  (find-pred "py-has-decorator" 'py-has-decorator-pred)
+  (find-pred "py-has-method" 'py-has-method-pred)
+  (find-pred "py-is-async" 'py-is-async-pred)
+  (when (py-calls-pred)
+    (define cp (py-calls-pred))
+    (define chp (py-has-child-pred))
+    (define bp (py-body-pred))
+    (define fkp (py-form-kind-pred))
+    (define defn-val (value! "function"))
+    (define-rule (py-contains-call (? expr) (? fn))
+      (current-triple (? expr) cp (? fn)))
+    (define-rule (py-contains-call (? expr) (? fn))
+      (current-triple (? expr) chp (? child))
+      (py-contains-call (? child) (? fn)))
+    (define-rule (py-fn-depends-on (? caller) (? callee))
+      (current-triple (? caller) fkp defn-val)
+      (current-triple (? caller) bp (? body))
+      (py-contains-call (? body) (? callee))
+      (current-triple (? callee) fkp defn-val))))
 
 ;; --- Parse Python via AST helper ---
 

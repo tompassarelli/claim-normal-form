@@ -145,6 +145,7 @@
 
   (ctx-set! 'rules '())
   (register-builtin-rules!)
+  (restore-python-lang!)
   (ctx-set! 'rule-entities (make-hash))
   (restore-user-rules!)
   (materialize!))
