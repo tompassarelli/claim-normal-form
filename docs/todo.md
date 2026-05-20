@@ -81,11 +81,32 @@ tuples), delta propagation is more expensive than batch fixpoint.
 Supersession still forces full recompute (by design — no rule-level
 provenance). See `docs/devlog/005-incremental-rule-addition.md`.
 
-## NOW: Live Agent Session
+## DONE: E4 Live Agent Session
 
-Two actual Claude sessions doing the same refactoring task. The
-benchmark numbers show the tool-level advantage. The live session
-shows the workflow-level difference: what each agent attempts, how
-it reasons, what it can't do.
+Side-by-side transcript: 7-step refactoring task, CNF vs text.
+Both agents compute identical results at every step (verified).
 
-**Done when:** transcript comparison with honest analysis.
+Text wins total: 27ms vs 262ms (supersede-rule costs 256ms alone).
+CNF wins sustained ops: 80x per-op (O(1) vs O(N²)). Crossover at
+~58 ops (N=100), ~12 (N=200), ~6 (N=500).
+
+The qualitative gap: CNF agent built 3 composable, persistent,
+inspectable rules. Text agent wrote 5 ad-hoc computations.
+See `docs/experiments/e4-live-session/` and `docs/devlog/006-live-agent-session.md`.
+
+## NOW: Rule-Level Provenance for Supersession
+
+The remaining bottleneck: `supersede-rule!` forces full fixpoint
+recompute (256ms in E4 Step 6). The fix: track which rule produced
+each derived tuple. On supersession, retract only that rule's tuples
+and re-derive through the replacement. Same approach that fixed
+claim-level deletion in E1.
+
+**Done when:** supersede-rule! is incremental (retract old + derive
+new) without full fixpoint recompute.
+
+## NEXT: Real Codebase Demo
+
+Run the MCP server against a non-toy Racket project (50+ functions).
+Show the full workflow: parse, discover, define rules, refactor,
+evolve. Honest timing and capability assessment at real scale.
