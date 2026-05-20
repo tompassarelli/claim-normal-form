@@ -29,3 +29,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 020 | 2026-05-20 | [Agent-in-the-loop: applying the analysis](020-agent-in-the-loop.md) |
 | 021 | 2026-05-21 | [F2: Real agents confirm the coordination thesis](021-f2-real-agents.md) |
 | 022 | 2026-05-21 | [F3: Live graph — accumulated context works](022-f3-live-graph.md) |
+| 023 | 2026-05-21 | [F4: Overlapping edits — the merge problem is structural](023-f4-overlap.md) |

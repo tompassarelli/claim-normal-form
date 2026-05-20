@@ -1,6 +1,23 @@
 # Claim Normal Form
 
-A structural reasoning scaffold for coding agents.
+Shared semantic substrate for parallel software construction.
+
+## The thesis
+
+Software construction doesn't scale with agent count because
+coordination cost dominates:
+
+```
+1 agent  → productive
+2 agents → coordination overhead
+5 agents → merge hell
+```
+
+The cost comes from rediscovery, inconsistent assumptions, hidden
+dependencies, and local-only cognition. **CNF attacks exactly those
+things.** The claim: shared semantic state makes software construction
+composable across many concurrent agents — the coordination curve
+flattens instead of exploding.
 
 ## The problem: private cognition
 
@@ -24,7 +41,7 @@ trapped inside isolated agent sessions**.
 
 ## What CNF does
 
-CNF externalizes program understanding into durable shared structure.
+CNF externalizes reasoning into durable shared structure.
 
 Instead of treating source code as text, CNF treats it as claims about
 stable identities. A function is an entity with a current name claim,
@@ -68,6 +85,43 @@ Replicated across two runs with real Claude Code agents (16 agents
 total). The four structural bugs appear in every git run and never
 in any CNF run.
 
+### F3: Live graph accumulation
+
+[Sequential agents, accumulated graph](docs/experiments/f3-live-graph/results.md).
+Each agent's code is parsed into the live CNF graph after it finishes.
+The next agent inherits all prior entities — the graph grows from 17
+to 34 entities across the pipeline.
+
+| | Git | CNF |
+|--|--:|--:|
+| Integration tests | **7/14** | **13/14** |
+| Cross-cutting bugs | **5** | **0** |
+
+Same five information-gap bugs in git. CNF's single failure: the
+permissions agent *found* `archive_ticket` in the graph but gave
+agents the permission too (test expects admin-only). A policy judgment
+made with full information — categorically different from the git
+failure where the agent doesn't know archive exists at all.
+
+### F4: Overlapping edits
+
+[Agents modify the same files](docs/experiments/f4-overlap/results.md)
+— shared config, shared hooks, mid-run requirement change. Three
+agents independently modify `config.py`. A new status (`on_hold`)
+is added after the first agent finishes.
+
+| | Git | CNF |
+|--|--:|--:|
+| Integration tests | **18/21** | **21/21** |
+| Config merge conflicts | **3 versions** | **0** |
+| Mid-run requirement handled | **no** | **yes** |
+
+Even with a perfect manual merge (no human error in conflict
+resolution), git agents miss the mid-run requirement entirely —
+they forked before `on_hold` existed. CNF agents see the updated
+graph and incorporate it naturally. The merge problem scales
+quadratically with agent count; sequential accumulation is O(N).
+
 ### E19: Coordination cost
 
 [Five agents on a 45-function codebase](docs/experiments/e19-coordination/results.md).
@@ -101,6 +155,12 @@ is untouched.
 - **F2**: Construction, not maintenance. The cross-cutting bugs
   are structural — they follow from the information gap, not from
   agent randomness.
+- **F3**: Live graph accumulation. Same correctness result, but the
+  context arrives via live MCP queries, not static prompt injection.
+  The infrastructure for scaling agent count.
+- **F4**: Overlapping edits. Agents modify the same files. Git
+  produces merge conflicts and misses mid-run changes. CNF
+  accumulates cleanly.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -209,11 +269,15 @@ Claude Code MCP configuration (`.claude/settings.json`):
 raco test cnf-test/tests/     # run all
 ```
 
-## Limitations
+## Limitations and what's next
 
-F2 is an existence proof, not a statistical benchmark. The important
-result is structural: agents missing shared state produced the exact
-classes of integration bugs predicted by the information gap.
+F2/F3 are existence proofs, not throughput benchmarks. They establish
+that shared semantic state eliminates information-gap bugs during
+parallel construction. The important open question is whether this
+compounds: does CNF throughput scale near-linearly with agent count
+while git throughput plateaus? That requires experiments with
+overlapping concurrent edits, not just separate files — and that's
+the target for F4.
 
 Benchmarks are at 50–200 functions. The correctness advantage is
 structural (entity references vs string matching) and doesn't depend

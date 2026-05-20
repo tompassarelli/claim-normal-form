@@ -28,6 +28,7 @@ a maintained semantic index than against text files.
 | E19 | Coordination cost | [results](e19-coordination/results.md) | **5 agents, 45 fns. Git rediscovery 56% (50 ops). CNF 0%. Git rename breaks downstream edit.** |
 | F2 | Parallel construction | [results](f2-claimdesk/results.md) | **5 agents build CRM app. Git 9/14 integration tests (5 cross-cutting bugs). CNF 14/14. Confirmed with real Claude Code agents.** |
 | F3 | Live graph | [results](f3-live-graph/results.md) | **Sequential agents, accumulated graph. Git 7/14 (5 cross-cutting bugs). CNF 13/14 (0 cross-cutting bugs, 1 policy decision). Live graph pipeline validated.** |
+| F4 | Overlapping edits | [results](f4-overlap/results.md) | **Shared file modification + mid-run requirement. Git 18/21 (3 temporal failures, merge conflicts). CNF 21/21. Three failure modes: merge conflicts, hidden dependencies, temporal divergence.** |
 
 ## The arc
 
@@ -146,3 +147,17 @@ agents access — test expects admin-only), not an information gap. The
 live graph mechanism works: parse → checkpoint → restore → query → parse
 new code → re-checkpoint. This is the infrastructure for true concurrent
 multi-agent construction.
+
+F4 pushed into overlapping edits — the real coordination challenge.
+Three agents independently modified the same config.py file (each
+adding actions, statuses, and hook registrations). A mid-run
+requirement (on_hold status) was injected after the first agent.
+Even with perfect manual merge resolution, the git condition missed
+on_hold entirely — agents can't incorporate information that didn't
+exist when they forked. The CNF condition accumulated cleanly: each
+agent read the current config.py and appended. Three distinct failure
+modes surfaced: merge conflicts (O(N²) in agent count), hidden
+dependencies (audit hooks depend on another agent's workflow fix),
+and temporal divergence (mid-run requirements invisible to forked
+agents). CNF addresses all three through sequential accumulation
+against the live graph.

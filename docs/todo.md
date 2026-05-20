@@ -478,13 +478,39 @@ validated: parse → checkpoint → restore → query → parse new code.
 Agent outputs: `experiments/f3-live-graph/git/` and `cnf/`.
 Results: `docs/experiments/f3-live-graph/results.md`.
 
-## NEXT: F4 — Concurrent Construction with Shared Files
+## DONE: F4 — Overlapping Edits
 
-F3 validated the sequential pipeline. The next step: agents that
-modify shared files concurrently, with the graph tracking entity-level
-changes and enabling merge at the entity level rather than the line
-level. True parallel construction where CNF is the coordination
-layer, not just a context provider.
+Agents modify shared files (config.py, workflow.py). Three agents
+independently produce three different config.py files. Mid-run
+requirement (on_hold status) added after Agent 1.
+
+**Git 18/21 (3 on_hold failures, required manual merge of 3 config
+versions). CNF 21/21 (sequential accumulation, no merge conflicts,
+on_hold incorporated naturally).**
+
+Three failure modes exposed: merge conflicts (3 independent config.py
+versions), hidden dependencies (audit hooks depend on notification
+agent's workflow fix), temporal divergence (on_hold added after git
+agents forked).
+
+Agent outputs: `experiments/f4-overlap/{git,cnf}/`.
+Results: `docs/experiments/f4-overlap/results.md`.
+
+## NEXT: F5 — Coordination Curve
+
+The killer experiment: throughput vs. agent count. Does CNF
+throughput scale near-linearly while git throughput plateaus?
+Design: same app, increasing agent count (2, 5, 10), measure
+integration test pass rate, merge resolution time, and total
+construction time. The dream graph:
+
+```
+Agents    Git throughput    CNF throughput
+1         1x                1x
+2         ~1.5x             ~1.9x
+5         ~2x               ~4.5x
+10        <2x               ~8x
+```
 
 ## LATER: BEAM Runtime
 
