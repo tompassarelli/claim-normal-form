@@ -27,3 +27,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 018 | 2026-05-20 | [E16 agent grounding harness](018-agent-grounding-harness.md) |
 | 019 | 2026-05-20 | [Text search is not program understanding](019-text-search-not-understanding.md) |
 | 020 | 2026-05-20 | [Agent-in-the-loop: applying the analysis](020-agent-in-the-loop.md) |
+| 021 | 2026-05-21 | [F2: Real agents confirm the coordination thesis](021-f2-real-agents.md) |
