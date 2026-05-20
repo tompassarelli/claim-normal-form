@@ -67,7 +67,7 @@ experiments, E1–E17).
 ```
 cnf-lib/
   main.rkt             Public API — (require cnf) re-exports core modules
-  server.rkt           30 MCP tools over JSON-RPC 2.0 — the agent control surface
+  server.rkt           29 MCP tools over JSON-RPC 2.0 — the agent control surface
   lang.rkt             Toy language bridge — (require cnf/lang)
   racket.rkt           Racket bridge (minimal) — (require cnf/racket)
   python.rkt           Python bridge — (require cnf/python)
@@ -169,7 +169,7 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 |-----|----------|
 | **[How CNF works](docs/overview.md)** | Concrete walkthrough — function as claims, rename, deps, agents |
 | **[API reference](docs/api.md)** | Kernel, Datalog, eval, schema, graph, lang layer APIs |
-| **[MCP server](docs/mcp.md)** | 30 tools, MCP Resources, workflows, daemon mode |
+| **[MCP server](docs/mcp.md)** | 29 tools, MCP Resources, workflows, daemon mode |
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |

@@ -12,8 +12,28 @@
          "private/eval.rkt"
          "private/graph.rkt"
          "private/schema.rkt"
-         "private/beagle.rkt"
          "private/python.rkt")
+
+;; Beagle bridge is optional — works without beagle-lib installed
+(define beagle-available?
+  (with-handlers ([exn:fail? (lambda (_) #f)])
+    (dynamic-require "private/beagle.rkt" #f)
+    #t))
+
+(define-syntax-rule (beagle-ref id)
+  (if beagle-available?
+      (dynamic-require "private/beagle.rkt" 'id)
+      (lambda args (error 'id "beagle-lib not installed"))))
+
+(define setup-beagle-lang! (beagle-ref setup-beagle-lang!))
+(define parse-beagle-program! (beagle-ref parse-beagle-program!))
+(define parse-beagle-file! (beagle-ref parse-beagle-file!))
+(define add-beagle-function! (beagle-ref add-beagle-function!))
+(define remove-beagle-function! (beagle-ref remove-beagle-function!))
+(define modify-beagle-function! (beagle-ref modify-beagle-function!))
+(define render-beagle-program (beagle-ref render-beagle-program))
+(define render-beagle-fn (beagle-ref render-beagle-fn))
+(define form-kind-pred (beagle-ref form-kind-pred))
 
 ;; --- Transport ---
 
@@ -40,7 +60,7 @@
   (setup-graph!)
   (setup-schema!)
   (setup-rule-predicates!)
-  (setup-beagle-lang!)
+  (when beagle-available? (setup-beagle-lang!))
   (setup-python-lang!)
   (materialize!))
 
@@ -1038,9 +1058,14 @@
     [("remove_function")
      (define fn-name (hash-ref arguments 'name))
      (define fn-id
-       (with-handlers ([exn:fail? (lambda (_)
-                         (remove-python-function! fn-name))])
-         (remove-beagle-function! fn-name)))
+       (let ([resolved (resolve-symbol fn-name)])
+         (cond
+           [(not resolved) (error 'remove_function "unknown function: ~a" fn-name)]
+           [(not (null? (current-claims-where #:l resolved #:p (py-form-kind-pred))))
+            (remove-python-function! fn-name)]
+           [beagle-available?
+            (remove-beagle-function! fn-name)]
+           [else (error 'remove_function "cannot determine language for: ~a" fn-name)])))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
      (format "Removed function ~a (id: ~a). Claims invalidated. Graph: ~a objects, ~a claims."

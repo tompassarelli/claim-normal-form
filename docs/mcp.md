@@ -1,6 +1,6 @@
 # MCP Server
 
-30 tools over JSON-RPC 2.0 / stdio. Claude Code connects and operates
+29 tools over JSON-RPC 2.0 / stdio. Claude Code connects and operates
 on the claim graph directly.
 
 ## Quick start

@@ -75,14 +75,20 @@
     (path->string (build-path (path-only resolved) "python-ast-helper.py"))))
 
 (define (parse-python-source source)
+  (define python-exe (find-executable-path "python3"))
+  (unless python-exe
+    (error 'parse-python-source "python3 not found on PATH"))
   (define-values (proc stdout stdin stderr)
-    (subprocess #f #f #f (find-executable-path "python3") python-helper-path))
+    (subprocess #f #f #f python-exe python-helper-path))
   (write-string source stdin)
   (close-output-port stdin)
   (define result (port->string stdout))
+  (define err-output (port->string stderr))
   (close-input-port stdout)
   (close-input-port stderr)
   (subprocess-wait proc)
+  (unless (zero? (subprocess-status proc))
+    (error 'parse-python-source "python3 failed:\n~a" err-output))
   (with-input-from-string result read-json))
 
 (define (parse-python-program! source)
