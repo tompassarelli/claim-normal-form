@@ -251,6 +251,144 @@ edit by supersession — text updates automatically.
 
 Run `racket lang-demo.rkt` for the full thesis demonstration.
 
+## MCP Server (`mcp-server.rkt`)
+
+30 tools over JSON-RPC 2.0 / stdio. Claude Code connects and operates
+on the claim graph directly.
+
+### Quick start
+
+```bash
+# Prerequisites: Racket 8.x
+racket --version
+
+# Stdio mode (Claude Code connects via MCP)
+racket mcp-server.rkt
+
+# Daemon mode (TCP, multi-client, auto-restores from checkpoint)
+racket mcp-server.rkt --daemon 7888
+
+# Bridge mode (stdio proxy to running daemon)
+racket mcp-server.rkt --connect 7888
+```
+
+### Claude Code configuration
+
+Add to your MCP settings (`.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "cnf": {
+      "command": "racket",
+      "args": ["/path/to/cnf-racket/mcp-server.rkt"]
+    }
+  }
+}
+```
+
+For daemon mode (shared state across sessions):
+
+```json
+{
+  "mcpServers": {
+    "cnf": {
+      "command": "racket",
+      "args": ["/path/to/cnf-racket/mcp-server.rkt", "--connect", "7888"]
+    }
+  }
+}
+```
+
+### Tool reference
+
+**Core (6 tools):**
+`reset`, `create_entity`, `create_named`, `create_value`, `claim`, `status`
+
+**Query (6 tools):**
+`query`, `inspect`, `resolve_symbol`, `claims_where`, `lookup`, `find_by`
+
+**Rules (3 tools):**
+`define_rule`, `list_rules`, `supersede_rule`
+
+**Schema (2 tools):**
+`define_predicates`, `update`
+
+**Program (6 tools):**
+`parse_program`, `render`, `rename`, `add_function`, `remove_function`,
+`modify_function`
+
+**Batch (1 tool):**
+`batch` — multiple operations in one call, with optional `atomic: true`
+for all-or-nothing transactions
+
+**Persistence (2 tools):**
+`checkpoint`, `restore`
+
+**Transactions (3 tools):**
+`tx_log`, `current_tx_seq`, `set_agent`
+
+### Key workflows
+
+**Parse and query:**
+```
+parse_program(source) → fn IDs + schema
+query("(fn-depends-on (? caller) (? callee))")
+```
+
+**Define custom rules:**
+```
+define_rule(head: "(trans-dep (? f) (? g))", body: "(fn-depends-on (? f) (? g))")
+define_rule(head: "(trans-dep (? f) (? g))", body: "(fn-depends-on (? f) (? m)) (trans-dep (? m) (? g))")
+query("(trans-dep some-function (? dep))")
+```
+
+**Incremental edit (no reparse):**
+```
+add_function(source: "(defn new-fn (x y) (+ (existing-fn x y) 1))")
+modify_function(name: "old-fn", source: "(defn old-fn (x y) (* x y))")
+remove_function(name: "deprecated-fn")
+# All rules and matviews auto-update through the mutations
+```
+
+**Cross-session persistence:**
+```
+checkpoint()   # save graph to ~/.cnf/checkpoint.json
+# ... new session ...
+restore()      # rebuild full graph + rules + matviews
+```
+
+**Multi-agent collaboration:**
+```
+set_agent(name: "structural-analyst")
+# ... define rules, query ...
+checkpoint()
+
+# Agent B:
+restore()
+set_agent(name: "quality-checker")
+list_rules()   # see Agent A's rules
+# ... define rules composing Agent A's derived relations ...
+tx_log()       # see interleaved agent transactions
+```
+
+### Daemon mode
+
+The daemon listens on TCP, serializes writes, and allows concurrent
+reads (read/write locking). Multiple Claude Code instances can connect
+via bridge mode and share the same claim graph.
+
+```bash
+# Terminal 1: start daemon
+racket mcp-server.rkt --daemon 7888
+
+# Terminal 2: agent A
+racket mcp-server.rkt --connect 7888
+
+# Terminal 3: agent B
+racket mcp-server.rkt --connect 7888
+```
+
 ## Performance
 
 The Datalog engine uses **semi-naive evaluation** with
@@ -285,24 +423,39 @@ Text grep:            ~0.1 ms
 
 Run `racket engine-bench.rkt` to reproduce.
 
+At scale (100-function financial analytics codebase, E12):
+
+```
+100 functions, 5 layers, 2399 objects, 1672 claims
+Parse:                  37 ms
+fn-depends-on (245 edges): 0.1 ms  (matview hit)
+trans-dep (1655 pairs):    0.2 ms  (matview hit)
+Rename:                 0.1 ms     (+ automatic matview update)
+add-function! (incremental): 55 ms
+modify-function!:       584 ms     (retract + reparse + rematerialize)
+remove-function!:       199 ms
+```
+
 **Honest limitations:**
-- Supersession (rename, update, retract) invalidates materialized
-  views. The next query after a supersession event pays the full
-  fixpoint cost. Provenance-tracked deletion would make this
-  O(delta) too.
-- The incremental win comes from evaluating fewer steps (5 instead
-  of 105), not from faster individual steps.
+- Materialization cost scales with output size. Rules producing O(N²)
+  tuples (shared-dep, hub-pair) can take seconds at N=100.
+- Incremental parse mutations trigger matview recomputation for
+  affected relations — modify-function! at 584ms is the worst case.
 - Dependency queries via Datalog are slower than grep for simple
   cases. The structural advantage is correctness (guaranteed complete
-  transitive closure) not speed.
+  transitive closure) and persistence (rules compose, matviews cache).
 
 ## Tests
 
+88 tests across 8 files:
+
 ```
 racket cnf-test.rkt      # 11 kernel tests
-racket datalog-test.rkt  # 12 datalog tests
+racket datalog-test.rkt  # 16 datalog tests (incl. incremental rule add/supersede)
 racket eval-test.rkt     # 6 evaluator tests
 racket demo-test.rkt     # 8 graph layer tests
 racket schema-test.rkt   # 10 schema layer tests
-racket lang-test.rkt     # 8 lang layer tests
+racket lang-test.rkt     # 15 lang tests (incl. incremental parse)
+racket tx-test.rkt       # 16 transaction tests (incl. agent identity)
+racket rwlock-test.rkt   # 6 read/write lock tests
 ```

@@ -278,8 +278,13 @@ Key numbers: 2399 objects, 1672 claims, 1655 transitive dep pairs,
 firm-pnl depends on 62 of 100 functions. All queries <1ms after
 materialization. Results: `docs/experiments/e12-real-demo/`.
 
-## LATER: Package for External Use
+## DONE: Package for External Use
 
-Ship the MCP server as a standalone tool other projects can point
-Claude Code at. Needs: installation instructions, configuration,
-documentation of the 26 tools, example workflows.
+README updated with full MCP server documentation:
+- Quick start (stdio, daemon, bridge modes)
+- Claude Code configuration (MCP settings JSON)
+- Tool reference (30 tools across 8 categories)
+- Key workflows (parse/query, custom rules, incremental edit,
+  persistence, multi-agent collaboration)
+- Updated performance numbers from E12 (100-function codebase)
+- Updated test counts (88 tests across 8 files)
