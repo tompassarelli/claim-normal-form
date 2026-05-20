@@ -425,6 +425,23 @@ Key results:
 See `experiments/e16-agent-grounding/` and
 `docs/experiments/e16-agent-grounding/results.md`.
 
+## NOW: E17 — Agent-in-the-Loop Evaluation
+
+Same model. Same tasks. Same hidden tests. Different tool surfaces.
+
+Condition A (text agent): read, search, edit, run tests.
+Condition B (CNF agent): MCP resources + CNF tools + edit/render/run tests.
+
+Measure:
+- Correct task completion (hidden tests passed)
+- False-positive edits (did you rename a dict key?)
+- Missed affected sites
+- Tool calls, tokens, time
+- Whether explanation matches ground truth
+
+This is the experiment that earns "CNF makes agents produce better code."
+E16 proved the substrate claim. E17 proves the agent claim.
+
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
 Current MVCC gives snapshot isolation for reads with serialized writes.

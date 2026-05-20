@@ -1,36 +1,34 @@
 # Claim Normal Form
 
-CNF is a persistent semantic graph for software projects.
+A semantic working copy for coding agents.
+
+Text search can find strings. CNF can answer what the program means.
 
 Instead of treating source code as text, CNF treats it as claims about
-stable identities. Functions, names, parameters, calls, dependencies,
-history, runtime events, and agent actions are all addressable objects
-in one graph.
-
-Text becomes a projection of the graph, not the source of truth.
-
-The immediate use case is AI coding agents. Agents working over text
-rediscover program structure every session. CNF gives them stable
-handles, persistent derived facts, semantic rename, dependency queries,
-and cross-session memory.
-
-A function is not the string `"add"`. It is an entity with a current
-name claim. A call site does not point at the characters `add`. It
-points at the function entity. So renaming `add` to `sum_two` is one
+stable identities. A function is not the string `"add"`. It is an
+entity with a current name claim. A call site points at the function
+entity, not at matching characters. Renaming `add` to `sum_two` is one
 new claim, not a repository-wide string edit.
+
+Functions, names, parameters, calls, dependencies, history, and agent
+actions are all addressable objects in one graph. Text becomes a
+projection of the graph, not the source of truth.
 
 **[How CNF works](docs/overview.md)** — a concrete walkthrough of how
 a function becomes claims, why rename is O(1), and what this means for
 agents. Start here.
 
-## Why it matters: text search gets structural questions wrong
+## Text search is not program understanding
 
-AI coding agents often answer structural questions by searching text:
-what calls this function, what breaks if it changes, what should be
-renamed, what is dead code?
+AI coding agents answer structural questions by searching text: what
+calls this function, what breaks if it changes, what should be renamed,
+what is dead code, what did a previous agent already learn?
 
-[E16](docs/experiments/e16-agent-grounding/results.md) tests 10
-structural tasks on a 45-function Python codebase with ground truth:
+[E16](docs/experiments/e16-agent-grounding/results.md) tests those
+questions on a 45-function Python codebase with ground truth.
+
+**CNF answered 7/7 structural tasks correctly.** Text search was wrong
+on 5 and unable to prove correctness on 2.
 
 | Task | CNF | Text search |
 |------|-----|-------------|
@@ -42,10 +40,26 @@ structural tasks on a 45-function Python codebase with ground truth:
 | Rename `order_total` (not `total()`) | **3 sites, 0 false positives** | 10 matches, 4+ false positives |
 | Cross-session memory | **10/10** | 0/10 (structurally impossible) |
 
-CNF correct on 7/7 structural tasks. Text search wrong on 5, unprovable
-on 2. Tasks 05–07 (local code changes) are doable by both — structural
-analysis is where entity-based reasoning provides answers that text
-search fundamentally cannot.
+The result is not that CNF is faster than grep. The result is that text
+search does not represent identity. On transitive-impact tasks, text
+search missed 48–80% of affected functions and produced false positives
+on every rename.
+
+Tasks 05–07 (local code changes) are doable by both — CNF is not magic
+sauce for all programming. CNF wins where stable identity, dependency
+closure, and cross-session structure matter.
+
+### Cross-session memory
+
+Every agent session wakes up with amnesia and re-derives the project
+from text. CNF's rules, derived facts, transactions, and agent actions
+are all claims in the graph. A second agent restores the first agent's
+semantic work instead of rebuilding context from files. Rename
+propagates through the restored graph automatically.
+
+This is not an optimization. It is structurally impossible with text
+tools — there is no shared semantic substrate to persist, inherit, or
+compose on. E16 task 10 scores 10/10 for CNF and 0/10 for text.
 
 See also [E15](docs/experiments/e15-correctness/results.md) (5-task
 correctness eval) and the full
@@ -133,7 +147,7 @@ racket demo.rkt          # Graph layer — rename, dependency, incremental recom
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
 | **[Experiments](docs/experiments/)** | 16 experiments (E1–E16) with raw results |
-| **[Devlog](docs/devlog/)** | 18 entries — discoveries, direction changes, honest numbers |
+| **[Devlog](docs/devlog/)** | 19 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests

@@ -25,3 +25,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 016 | 2026-05-20 | [Python bridge + MCP Resources + language-agnostic server](016-python-bridge-mcp-resources.md) |
 | 017 | 2026-05-20 | [Correctness, not speed](017-correctness-not-speed.md) |
 | 018 | 2026-05-20 | [E16 agent grounding harness](018-agent-grounding-harness.md) |
+| 019 | 2026-05-20 | [Text search is not program understanding](019-text-search-not-understanding.md) |
