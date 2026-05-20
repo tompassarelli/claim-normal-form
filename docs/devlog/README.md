@@ -13,3 +13,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 004 | 2026-05-20 | [E3 agent comparison: honest numbers](004-agent-comparison.md) |
 | 005 | 2026-05-20 | [Incremental rule addition](005-incremental-rule-addition.md) |
 | 006 | 2026-05-20 | [Live agent session: workflow comparison](006-live-agent-session.md) |
+| 007 | 2026-05-20 | [Incremental rule supersession](007-incremental-supersession.md) |

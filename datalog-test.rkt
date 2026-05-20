@@ -358,5 +358,69 @@
 
   (displayln "PASS 15 — incremental rule addition without full recompute"))
 
+;; 16. Incremental rule supersession — supersede without full fixpoint recompute
+(reset-store!)
+(reset-rules!)
+(setup-rule-predicates!)
+(define sup-pred2 (named! "supersedes"))
+(set-supersedes-pred! sup-pred2)
+
+(let ()
+  (define ep (named! "edge"))
+  (define a (named! "a"))
+  (define b (named! "b"))
+  (define c (named! "c"))
+  (define d (named! "d"))
+  (void (claim! a ep b))
+  (void (claim! b ep c))
+  (void (claim! c ep d))
+
+  ;; Materialize base rules
+  (define-rule (direct (? x) (? y))
+    (triple (? x) ep (? y)))
+  (materialize!)
+
+  ;; Add a 2-hop rule incrementally
+  (define old-rule-ent
+    (define-rule!/claims
+      (atom 'hop2 (list (var 'x) (var 'z)))
+      (list (atom 'direct (list (var 'x) (var 'y)))
+            (atom 'direct (list (var 'y) (var 'z))))))
+
+  (check-true (ctx-ref 'matview-valid? #f))
+  (define r1 (query (hop2 (? x) (? z))))
+  (check-equal? (length r1) 2)  ; a→c, b→d
+
+  ;; Supersede to 3-hop — should stay incremental
+  (define new-rule-ent
+    (supersede-rule! old-rule-ent
+      (atom 'hop2 (list (var 'x) (var 'w)))
+      (list (atom 'direct (list (var 'x) (var 'y)))
+            (atom 'direct (list (var 'y) (var 'z)))
+            (atom 'direct (list (var 'z) (var 'w))))))
+
+  ;; Matview should still be valid (incremental, not invalidated)
+  (check-true (ctx-ref 'matview-valid? #f))
+
+  ;; New rule should produce different results
+  (define r2 (query (hop2 (? x) (? w))))
+  (check-equal? (length r2) 1)  ; a→d only
+  (check-equal? (hash-ref (first r2) 'x) a)
+  (check-equal? (hash-ref (first r2) 'w) d)
+
+  ;; Old hop2 tuples must be gone (not a→c, b→d)
+  (check-false
+    (ormap (λ (s) (equal? (hash-ref s 'w) c)) r2))
+
+  ;; Base rule still works
+  (define r3 (query (direct (? x) (? y))))
+  (check-equal? (length r3) 3)
+
+  ;; Old rule entity should be removed
+  (check-false (member old-rule-ent (list-rule-entities)))
+  (check-not-false (member new-rule-ent (list-rule-entities)))
+
+  (displayln "PASS 16 — incremental rule supersession without full recompute"))
+
 (displayln "")
 (displayln "All Datalog tests passed.")

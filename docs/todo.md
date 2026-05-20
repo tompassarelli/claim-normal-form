@@ -86,26 +86,24 @@ provenance). See `docs/devlog/005-incremental-rule-addition.md`.
 Side-by-side transcript: 7-step refactoring task, CNF vs text.
 Both agents compute identical results at every step (verified).
 
-Text wins total: 27ms vs 262ms (supersede-rule costs 256ms alone).
-CNF wins sustained ops: 80x per-op (O(1) vs O(N²)). Crossover at
-~58 ops (N=100), ~12 (N=200), ~6 (N=500).
+After incremental supersession: CNF wins total 3.26x (was 0.1x).
+307x per-op sustained advantage. No crossover — CNF wins from start.
 
 The qualitative gap: CNF agent built 3 composable, persistent,
 inspectable rules. Text agent wrote 5 ad-hoc computations.
 See `docs/experiments/e4-live-session/` and `docs/devlog/006-live-agent-session.md`.
 
-## NOW: Rule-Level Provenance for Supersession
+## DONE: Incremental Rule Supersession
 
-The remaining bottleneck: `supersede-rule!` forces full fixpoint
-recompute (256ms in E4 Step 6). The fix: track which rule produced
-each derived tuple. On supersession, retract only that rule's tuples
-and re-derive through the replacement. Same approach that fixed
-claim-level deletion in E1.
+`try-supersede-incremental!` retracts the affected relation's tuples
+and re-derives via the replacement rule. No full fixpoint recompute
+when the head relation has no IDB dependents (typical case).
 
-**Done when:** supersede-rule! is incremental (retract old + derive
-new) without full fixpoint recompute.
+E4 Step 6: 256ms → 16ms (16x). E3 Phase 5 at N=200: 110ms → 3.5ms
+(31x). CNF now wins total wall time at N=100 (1.95x, was 0.53x).
+60 tests passing. See `docs/devlog/007-incremental-supersession.md`.
 
-## NEXT: Real Codebase Demo
+## NOW: Real Codebase Demo
 
 Run the MCP server against a non-toy Racket project (50+ functions).
 Show the full workflow: parse, discover, define rules, refactor,

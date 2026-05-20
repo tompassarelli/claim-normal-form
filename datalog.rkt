@@ -561,6 +561,7 @@
        (ctx-set! 'matview-prov prov-map)
        (ctx-set! 'matview-claim-rev claim-rev)
        (ctx-set! 'matview-resolved-rules resolved-rules)
+       (ctx-set! 'matview-ent-to-resolved (make-hash))
        (ctx-set! 'matview-valid? #t)
        fresh-db]
       [else
@@ -583,6 +584,7 @@
   (ctx-set! 'matview-prov prov-map)
   (ctx-set! 'matview-claim-rev claim-rev)
   (ctx-set! 'matview-resolved-rules resolved-rules)
+  (ctx-set! 'matview-ent-to-resolved (make-hash))
   (ctx-set! 'matview-valid? #t)
   (unless (ctx-ref 'matview-hooks-registered? #f)
     (ctx-set! 'on-claim-hooks
@@ -752,7 +754,55 @@
   (unless (hash-empty? delta)
     (for ([(rel tuples) (in-hash delta)])
       (hash-set! db rel (append tuples (hash-ref db rel '()))))
-    (propagate-idb-delta/prov! db prov-map claim-rev all-rules delta)))
+    (propagate-idb-delta/prov! db prov-map claim-rev all-rules delta))
+
+  resolved)
+
+;; --- Incremental rule supersession ---
+;;
+;; When a rule is superseded and no other rule references its head relation
+;; in a body atom, we can avoid the full fixpoint recompute:
+;;   1. Retract all tuples of the affected relation + clean provenance
+;;   2. Remove the old resolved rule from the matview rule list
+;;   3. Add the new rule via propagate-new-rule/prov! (incremental)
+;;
+;; Falls back to full recompute when dependent rules exist.
+
+(define (retract-relation-tuples! db prov-map claim-rev rel)
+  (define old-tuples (hash-ref db rel '()))
+  (for ([tup (in-list old-tuples)])
+    (define key (cons rel tup))
+    (define old-claims (hash-ref prov-map key (set)))
+    (hash-remove! prov-map key)
+    (for ([c (in-set old-claims)])
+      (hash-update! claim-rev c (lambda (s) (set-remove s key)) (set))))
+  (hash-remove! db rel))
+
+(define (relation-has-idb-dependents? rel rules)
+  (for/or ([r (in-list rules)])
+    (for/or ([a (in-list (dl-rule-body r))])
+      (and (not (edb-rel? (atom-rel a)))
+           (eq? (atom-rel a) rel)))))
+
+(define (try-supersede-incremental! old-rule-ent old-resolved)
+  (define db (ctx-ref 'matview-db #f))
+  (when (not db) (error 'try-supersede-incremental! "no matview DB"))
+  (define prov-map (ctx-ref 'matview-prov))
+  (define claim-rev (ctx-ref 'matview-claim-rev))
+  (define old-head-rel (atom-rel (dl-rule-head old-resolved)))
+  (define current-resolved (ctx-ref 'matview-resolved-rules '()))
+  (define remaining (remq old-resolved current-resolved))
+
+  (cond
+    [(relation-has-idb-dependents? old-head-rel remaining)
+     (ctx-set! 'matview-resolved-rules remaining)
+     #f]
+    [else
+     (retract-relation-tuples! db prov-map claim-rev old-head-rel)
+     (ctx-set! 'matview-resolved-rules remaining)
+     (define ent-map (ctx-ref 'matview-ent-to-resolved #f))
+     (when (hash? ent-map) (hash-remove! ent-map old-rule-ent))
+     #t]))
 
 ;; --- Homoiconic rules (rules as claims) ---
 ;;
@@ -800,7 +850,12 @@
   (ctx-set! 'rules (cons rule (ctx-ref 'rules '())))
   (hash-set! (ctx-ref 'rule-entities) rule-ent rule)
   (if (and (ctx-ref 'matview-db #f) (ctx-ref 'matview-valid? #f))
-      (propagate-new-rule/prov! rule)
+      (let ([resolved (propagate-new-rule/prov! rule)])
+        (define ent-map (ctx-ref 'matview-ent-to-resolved #f))
+        (unless (hash? ent-map)
+          (set! ent-map (make-hash))
+          (ctx-set! 'matview-ent-to-resolved ent-map))
+        (hash-set! ent-map rule-ent resolved))
       (invalidate-views!))
   rule-ent)
 
@@ -814,7 +869,17 @@
   (define sup-pred (supersedes-pred-id))
   (for ([c (in-list (current-claims-where #:l old-rule-ent))])
     (claim! (entity!) sup-pred (first c)))
-  (invalidate-views!)
+
+  (define ent-map (ctx-ref 'matview-ent-to-resolved #f))
+  (define old-resolved (and (hash? ent-map) (hash-ref ent-map old-rule-ent #f)))
+  (define can-incremental?
+    (and old-resolved
+         (ctx-ref 'matview-db #f)
+         (ctx-ref 'matview-valid? #f)
+         (try-supersede-incremental! old-rule-ent old-resolved)))
+
+  (unless can-incremental?
+    (invalidate-views!))
   (define-rule!/claims new-head-atom new-body-atoms))
 
 (define (list-rule-entities)
