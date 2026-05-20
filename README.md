@@ -5,6 +5,10 @@ Software should not primarily live as text files. It should live as a claim grap
 A data-modeling normal form where everything is objects and claims.
 In-memory Racket kernel + Datalog query engine.
 
+**[How CNF works](docs/overview.md)** — start here. A concrete walkthrough
+of how a trivial function becomes claims, why rename is O(1), and what
+this means for AI agents.
+
 See [specification.md](specification.md) for the full spec.
 
 ## The ontology
