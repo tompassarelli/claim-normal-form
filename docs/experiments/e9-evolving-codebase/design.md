@@ -1,232 +1,106 @@
-# E9: The Evolving Codebase
+# E9: Accumulated Knowledge at Scale
 
 ## Thesis under test
 
-CNF agents maintain structural understanding incrementally through
-mutations. Text agents must re-analyze from scratch. The cost gap
-grows with codebase size, mutation frequency, and session length.
+CNF agents accumulate structural knowledge (rules, matviews) that
+reduces per-task cost across a multi-task session. Text agents use
+Python scripts that are individually cheap but don't compose.
 
-E5–E8 held these variables constant (small, stable, known-questions)
-and text won. E9 varies them.
+E5–E8 couldn't test this properly because: (1) all tasks were given
+upfront, enabling front-loading into one script, (2) the program
+was 20 functions — too small for re-analysis to cost anything.
 
-## Protocol
+## What E9 changes
 
-**Two agents.** Same tasks, same codebase, same mutations. One uses
-CNF MCP tools, one uses text tools (read, grep, sed, Python).
+- **50 functions** (2.5x E5–E8) with 81 dependency edges
+- **Tasks that build on each other** — task 4 renames a function,
+  tasks 5+ must work with the renamed codebase
+- **7 tasks** mixing analysis, rule definition, mutation, and
+  composition
 
-**Sequential revelation.** Tasks are given one at a time. The agent
-completes a task, reports the answer, and receives the next task.
-No lookahead. This prevents the front-loading strategy that dominated
-E8.
+## What E9 does NOT test
 
-**External mutations.** Between some tasks, the codebase changes.
-New functions appear, existing functions are modified, functions are
-renamed. For the text agent, the file is updated. For the CNF agent,
-the claim graph is updated via `parse_program` on the new source.
+- **External mutations.** The engine doesn't support incremental
+  parse — `parse_program` creates new entities, so re-parsing after
+  external changes would require reset (losing all rules). The only
+  mutation is agent-initiated rename.
+- **Sequential revelation.** The Agent tool can't send tasks one at
+  a time. Both agents see all 7 tasks upfront. Tasks are designed
+  to build on each other, making natural front-loading harder.
+- **Scale beyond 50 functions.** Still a toy program.
 
-**Measurement:** tool calls per round, correctness, total calls,
-wall time.
+These are honest limitations, not deferrals.
 
 ## Program
 
-50 functions across 4 layers in a data processing pipeline DSL:
+50 functions across 4 layers in a data processing pipeline DSL.
 
-**Layer 1 — Primitives (12 functions):**
-Leaf operations with no dependencies. String manipulation, math,
-type conversion, validation. These are the stable foundation.
-
-**Layer 2 — Transforms (14 functions):**
-Each calls 2-3 primitives. Data cleaning, normalization, formatting.
-Medium fan-out.
-
-**Layer 3 — Combinators (14 functions):**
-Each calls 2-4 transforms. Pipeline stages, filter chains, mappers.
-This is where the interesting dependency structure lives.
-
-**Layer 4 — Pipelines (10 functions):**
-Top-level compositions calling combinators. Entry points. Some share
-combinators, creating overlapping dependency cones.
+| Layer | Count | Dependencies |
+|-------|------:|-------------|
+| L1 — Primitives | 12 | None (leaves) |
+| L2 — Transforms | 14 | 2-3 L1 functions each |
+| L3 — Combinators | 14 | 2-3 L2 functions each |
+| L4 — Pipelines | 10 | 2-3 L3/L4 functions each |
 
 Properties:
-- ~120 dependency edges (avg 2.4 per function)
-- 3-4 hubs with 6+ callers
-- 2-3 pairs of suspiciously similar functions (planted bugs)
-- Some mutual dependencies between combinators (cycles)
-- 1 unreachable function (dead code)
+- 81 dependency edges
+- `normalize` is the biggest hub (7 direct callers)
+- `to-int` has 5 callers, `clamp` has 4
+- 2 duplicate pairs: lower=upper, validate=negate
+- 2 dead functions: negate (L1, never called), group-pair (L3, never called)
+- 6 shared-dependency pairs (functions sharing 2+ direct deps)
+- Max dependency depth: 4
+- 5 functions have 3 deps (nested calls) for graph variety
+- 1 cross-layer edge (pipeline → output, L4→L4)
 
-## Rounds
+Source: `experiments/e9-program.txt`
 
-### Round 1: Orientation (no mutation)
+## Tasks
 
-Parse the 50-function program.
+1. **Structure Discovery:** Layers, leaves, roots, biggest hub
+2. **Duplicate Detection:** Identical implementations, their callers
+3. **Transitive Dependencies:** Define rule, query for normalize
+4. **Rename + Verify:** normalize → norm, show propagation
+5. **Post-Rename Validation:** Transitive deps of norm match task 3
+6. **Shared Dependencies:** Pairs sharing 2+ direct deps
+7. **Final Report:** Edges, depth, hubs, dead code, duplicates
 
-**Task:** "Map the dependency layers. Which functions are leaves?
-Which are roots? Which function has the most callers?"
+## Expected answers
 
-*What this tests:* Initial setup cost. CNF pays parse + rule
-definition. Text pays read + one analysis script. Similar to E8
-task 1 but at 2.5x scale.
+- Leaves: 12 (all L1 functions)
+- Roots: 9 (negate, group-pair, enrich, output, archive, replicate,
+  migrate, audit, reconcile, pipeline) — wait, that's 10. [pipeline,
+  enrich, archive, replicate, migrate, audit, reconcile = 7 L4 roots
+  + negate (L1) + group-pair (L3) = 9 roots. output is called by
+  pipeline so it's NOT a root.]
+- Hub: normalize (7 callers)
+- Duplicates: lower/upper `(* x (- x y))`, validate/negate `(- (* x x) (* y y))`
+- Transitive deps of normalize: 16 functions
+- Shared-dep pairs (2+ shared): 6 pairs
+- Dead code: negate, group-pair
+- Depth: 4
+- Total edges: 81
 
-### Round 2: Deep query (no mutation)
+## Predictions
 
-**Task:** "Find all pairs of functions that have identical or
-near-identical implementations. For each pair, list which functions
-would be affected if we merged them."
+**CNF agent (optimistic):** 7-10 MCP calls. Batch combines setup +
+queries. Rules persist across tasks. Rename auto-updates matview.
+Post-rename query hits existing rule (0 extra work).
 
-*What this tests:* Multi-step reasoning. The CNF agent can define
-a `similar-body` rule and compose it with `transitive-dep`. The
-text agent needs custom comparison logic. Both should manage, but
-the CNF rule persists for later.
+**CNF agent (realistic):** 12-18 MCP calls. Exploration, verification
+renders, ID lookups, and mistakes add calls.
 
-### Round 3: First mutation
+**Text agent (optimistic):** 3-5 calls. One comprehensive Python
+script handles tasks 1-3, 6-7. Sed for rename. Verification read.
 
-**Mutation:** 8 new functions added (2 primitives, 3 transforms,
-3 combinators). Some call existing functions; some are called by
-existing pipelines that are updated.
+**Text agent (realistic):** 6-10 calls. Separate scripts per task,
+re-reading file after rename, verification steps.
 
-**Task:** "What changed? Which existing functions are now affected
-by the new code? Did any of the duplication pairs from Round 2
-change?"
+**Honest prediction:** Text wins on raw call count. A Python script
+is a universal batch operation — one Bash call can do unlimited
+computation. The CNF agent's batch tool is powerful but each
+operation is a defined MCP tool, not arbitrary code.
 
-*What this tests:* Incremental analysis after addition. The CNF
-matview propagates the new dependencies automatically. The text
-agent must re-read, re-analyze, and diff against its prior results.
-The question explicitly references Round 2's findings — the agent
-must either remember or recompute.
-
-### Round 4: Targeted rename
-
-**Task:** "Rename `normalize` to `normalize-v2` and rename
-`clean-whitespace` to `strip-ws`. Show all affected code for both
-renames."
-
-*What this tests:* Semantic rename. CNF does this in 2 calls
-(rename + render). Text does sed + verify, but at 58 functions,
-there's more risk of partial matches and more verification needed.
-
-### Round 5: Second mutation + rule evolution
-
-**Mutation:** 5 functions refactored — their implementations change
-but their signatures stay the same. A new shared helper is extracted.
-
-**Task:** "Did the refactoring change any dependency edges? Did it
-fix any of the duplication from Round 2? Define or update a rule
-for 'functions with shared implementation patterns' and report the
-current groups."
-
-*What this tests:* This is the CNF showcase. The `similar-body`
-rule from Round 2 needs supersession — the refactored functions
-have new bodies. The CNF agent uses `supersede_rule` and the
-matview auto-updates. The text agent rewrites its comparison
-logic.
-
-### Round 6: Impact analysis after cumulative changes
-
-**Task:** "Since the beginning of the session, which dependency
-edges were added, removed, or changed? Produce a delta report."
-
-*What this tests:* Historical reasoning. CNF has supersession
-history — every old claim is preserved. Comparing current vs
-original claims is a query. The text agent has no history; it
-must diff the original file against the current one and re-derive
-the dependency graph for both.
-
-### Round 7: Third mutation (scale stress)
-
-**Mutation:** 12 more functions added. Program is now 70 functions.
-
-**Task:** "Recompute the layer map. Which layer has the most
-internal dependencies? Are there any dependency cycles?"
-
-*What this tests:* Scale sensitivity. At 70 functions with ~170
-edges, re-analysis is getting expensive for text. The CNF matview
-absorbs the new functions incrementally.
-
-### Round 8: Synthesis
-
-**Task:** "Produce a structural health report: total functions,
-dependency depth, hub functions (>5 callers), orphans (unreachable),
-remaining duplication, and any cycles. Compare to Round 1's
-baseline."
-
-*What this tests:* Cumulative knowledge. Everything the CNF agent
-defined (rules, matviews) feeds directly into this report. The
-text agent must either remember its Round 1 results from context
-or recompute everything.
-
-## What we expect
-
-### CNF agent
-
-- **Round 1:** 4-6 calls (parse, query deps, define layer rules,
-  query results). Higher than text's initial setup.
-- **Rounds 2-8:** 1-3 calls each. Queries hit matview. Mutations
-  are absorbed by re-parse. Rule evolution via supersede_rule.
-- **Round 6:** This is where CNF should shine — historical query
-  over supersession history is a built-in capability.
-- **Estimated total:** 15-25 calls.
-
-### Text agent
-
-- **Round 1:** 2-3 calls (read + Python analysis). Fast.
-- **Rounds 3, 5, 7 (mutations):** Must re-read and re-analyze.
-  2-3 calls each to rebuild understanding.
-- **Round 6 (history):** Must re-derive the original graph from
-  the original file and diff. 3-4 calls.
-- **Round 2, 4, 8:** 1-2 calls each (Python script or grep).
-- **Estimated total:** 15-22 calls.
-
-### The honest prediction
-
-The totals may be close. The per-round pattern is what matters:
-- Text agent's cost is ~constant per round (re-analyze every time)
-- CNF agent's cost drops after Round 1 (matview absorbs changes)
-
-If we see CNF at 2 calls/round for rounds 3-8 while text stays at
-2-3 calls/round, the incremental thesis is validated at real scale
-with real mutations.
-
-If the text agent finds a way to maintain state across mutations
-(e.g., incremental Python scripts that patch their own data
-structures), that's also a meaningful finding — it would mean the
-CNF architecture can be replicated in ad-hoc code, which challenges
-the thesis in a different way.
-
-## Implementation requirements
-
-### Program generation
-
-Hand-write the 50-function program. It must be:
-- Large enough that re-analysis is non-trivial
-- Structured enough that the dependency graph has interesting properties
-- Contain planted bugs (duplication, dead code, cycles) for tasks to find
-- Written in the arena S-expression DSL
-
-### Mutation scripts
-
-Pre-define the 3 mutations (rounds 3, 5, 7):
-- Each is a new version of the source file
-- Mutations are realistic (additions, refactors, extractions)
-- The CNF agent sees the delta; the text agent sees the new file
-
-### Harness
-
-A coordinator script that:
-1. Gives the agent a task
-2. Collects the response (tool calls + answer)
-3. Applies the next mutation if applicable
-4. Gives the next task
-
-For real agents, this is the human operator (us). For scripted
-validation, this could be a bash script piping tasks through.
-
-### Fairness
-
-Both agents must:
-- See the same source at each round
-- Answer the same questions
-- Not see future tasks
-- Have their tool calls counted consistently
-
-The CNF agent's re-parse after mutation counts as a tool call.
-The text agent's re-read after mutation counts as a tool call.
+The interesting finding will be in the PATTERN: does CNF's per-task
+cost decrease while text stays constant? And does the rename in
+task 4 cause the text agent extra work in task 5?
