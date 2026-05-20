@@ -6,6 +6,7 @@
          ?
          define-rule
          query
+         run-query
          show-results
          reset-rules!
          supersedes-pred-id

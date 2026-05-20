@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cnf": {
+      "command": "racket",
+      "args": ["/home/tom/code/cnf-racket/mcp-server.rkt"]
+    }
+  }
+}
