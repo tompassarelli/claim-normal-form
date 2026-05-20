@@ -441,47 +441,34 @@ and 09 are ties — CNF doesn't win on local changes or unique names.
 See `experiments/e17-agent-in-the-loop/` and
 `docs/experiments/e17-agent-in-the-loop/results.md`.
 
-## NOW: F2 — Parallel Feature Construction (ClaimDesk)
+## DONE: F2 — Parallel Feature Construction (ClaimDesk)
 
-E1–E19 proved the data model and coordination thesis. The next goal:
+Five agents build a CRM/helpdesk app (workflow, permissions, audit,
+notifications, analytics). Mid-build requirement: archived tickets
+are silent and excluded from active reports.
 
-> **Can multiple agents, sharing a semantic graph, collaboratively
-> build a coherent application without collapsing into merge hell?**
+**Scripted experiment**: Git 9/14 integration tests (5 cross-cutting
+bugs). CNF 14/14 (0 bugs). Bugs: notifications fire for archived,
+analytics count archived as active, permissions miss archive action.
 
-**ClaimDesk** — a small CRM/helpdesk/workflow app. The domain is
-structurally rich: entities, state transitions, rules, derived views,
-notifications, permissions, audit trails, evolving business logic,
-cross-cutting consequences. This is exactly the environment where
-semantic coordination matters and text coordination breaks.
+**Real Claude Code agents**: 8 Sonnet agents (4 git, 4 CNF) launched
+in parallel with identical task specs. Git agents see base code only.
+CNF agents see base + workflow.py + structural context from claim graph.
 
-Five agents, each building a cross-cutting feature:
+Result: **Git 9/14 (5 bugs), CNF 14/14 (0 bugs).** Same five failures
+as scripted. The bugs are structural — they follow from the information
+gap, not from agent randomness.
 
-1. **Entities + workflow states** — tickets, contacts, state machine
-2. **Permissions** — who can do what, role-based access
-3. **Audit log** — track every state change with attribution
-4. **Notifications** — trigger alerts on state transitions
-5. **Analytics/reporting** — derived views over ticket lifecycle
+Agent-generated code saved in `experiments/f2-claimdesk/real-agents/`.
+Full results: `docs/experiments/f2-claimdesk/results.md`.
 
-Mid-build requirement change:
+## NEXT: F3 — Full Real-Agent Construction
 
-> *Archived tickets cannot trigger notifications and are excluded
-> from active reports, but remain visible in audit history.*
-
-This stresses knowledge propagation, consequence discovery,
-contradictory assumptions, shared understanding. In git, each agent
-re-reads files, makes assumptions about shared entities, and produces
-edits that silently conflict. In CNF, the requirement becomes a rule
-that propagates through derived views — every agent sees the
-consequence immediately.
-
-Metrics: feature completeness, downstream consistency, hidden
-integration correctness, coordination overhead, wall-clock delivery
-time, contradictory edits.
-
-Current Racket daemon (serialized writes, concurrent reads) is
-sufficient. The meaningful parallelism is five agents sharing semantic
-state while building one coherent app. BEAM is a natural future
-runtime for true write concurrency, but is not required for this proof.
+F2 proved the concept with a constrained setup (separate files, no
+shared modifications). The next step: agents that modify shared files,
+resolve conflicts, and build against a live-updating graph. True
+parallel construction where the CNF graph is the coordination layer,
+not just a read-only context provider.
 
 ## LATER: BEAM Runtime
 

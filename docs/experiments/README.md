@@ -26,6 +26,7 @@ a maintained semantic index than against text files.
 | E17 | Agent-in-the-loop | [results](e17-agent-in-the-loop/results.md) | **CNF 30/30, text 26/30. Both pass all tests — difference is in API contracts.** |
 | E18 | Real baseline | [results](e18-real-baseline/results.md) | **Rope ties CNF 30/30. Regex 26/30. Substrate properties: 5/5 (rope: N/A).** |
 | E19 | Coordination cost | [results](e19-coordination/results.md) | **5 agents, 45 fns. Git rediscovery 56% (50 ops). CNF 0%. Git rename breaks downstream edit.** |
+| F2 | Parallel construction | [results](f2-claimdesk/results.md) | **5 agents build CRM app. Git 9/14 integration tests (5 cross-cutting bugs). CNF 14/14. Confirmed with real Claude Code agents.** |
 
 ## The arc
 
@@ -119,3 +120,17 @@ Bonus finding: git's naive rename breaks Agent D's downstream edit
 entity from the parameter entity, so the edit succeeds. The graph is
 shared working memory: program facts, derived relations, agent actions,
 and composable rules all persist and compound across sessions.
+
+F2 moved from maintenance tasks to construction. Five agents build a
+CRM app: workflow state machine, permissions, audit, notifications,
+analytics. The features cross-cut — notifications must suppress for
+archived tickets, analytics must exclude them from active counts,
+permissions must include the archive action. In the git condition,
+each agent only sees the base code and builds its feature blind to
+what others built. Result: 5 cross-cutting bugs, all from the same
+root cause — agents don't know about each other's entities. In the
+CNF condition, agents query the claim graph and discover archive_ticket,
+is_archived, ACTIVE_STATUSES before writing code. Result: 0 bugs.
+First confirmed with scripted agents, then replicated with real Claude
+Code agents making genuine implementation decisions. The five failures
+are identical in both runs — they're structural, not stochastic.
