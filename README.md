@@ -39,6 +39,8 @@ self-consistent. The bugs are in the gaps.
 The enemy is not text, not grep, not git. The enemy is **cognition
 trapped inside isolated agent sessions**.
 
+**Git agents fork reality. CNF agents accumulate reality.**
+
 ## What CNF does
 
 CNF externalizes reasoning into durable shared structure.
@@ -183,6 +185,10 @@ is untouched.
 - **F5**: Coordination curve. Eight agents, three tiers. Git 89%,
   CNF 100%. All failures are temporal divergence — the same
   structural cause, now at scale.
+- **F6**: Time to correct. Real agents, wall clock to 28/28. Git
+  276s (parallel + repair), CNF 500s (sequential, no repair).
+  **Git 1.8x faster.** Parallelism beats correctness when
+  repair is cheap. CNF needs its own parallelism.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -279,8 +285,8 @@ Claude Code MCP configuration (`.claude/settings.json`):
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 24 experiments (E1–E19, F2–F5) with raw results |
-| **[Devlog](docs/devlog/)** | 24 entries — discoveries, direction changes, honest numbers |
+| **[Experiments](docs/experiments/)** | 25 experiments (E1–E19, F2–F6) with raw results |
+| **[Devlog](docs/devlog/)** | 25 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests
@@ -293,20 +299,26 @@ raco test cnf-test/tests/     # run all
 
 ## Limitations and what's next
 
-F2-F5 are existence proofs, not throughput benchmarks. They establish
-that shared semantic state eliminates coordination bugs during
-parallel construction — across information gaps (F2/F3), overlapping
-edits (F4), and scaling agent count (F5). CNF holds at 100% across
-all experiments while git ranges from 50% to 89%.
+F2-F5 establish that shared semantic state eliminates coordination
+bugs during parallel construction — across information gaps (F2/F3),
+overlapping edits (F4), and scaling agent count (F5). CNF holds at
+100% across all experiments while git ranges from 50% to 89%.
 
-The CNF pipeline in these experiments is sequential, not concurrent.
-True parallel construction with live graph synchronization is the
-BEAM target — entity-as-process, concurrent claims, real-time
-coordination. These experiments validate the information-sharing
-mechanism; the concurrency mechanism is next.
+F6 tested wall clock time to correct code. Git won 1.8x (276s vs
+500s) because parallel build + one cheap repair round beat
+sequential-but-correct. The repair agent fixed 6 failures in 56
+seconds — the failures had clear error messages and local fixes.
+CNF's correctness advantage is real but currently costs more time
+than it saves.
+
+The path forward is CNF parallelism: concurrent agents writing to
+the shared graph simultaneously, getting both speed and correctness.
+That's the BEAM target — entity-as-process, concurrent claims,
+real-time coordination. F6 shows why it matters: without parallelism,
+correctness alone doesn't win on time.
 
 Benchmarks are at 50–200 functions. The correctness advantage is
 structural (entity references vs string matching) and doesn't depend
-on scale, but performance at large scale is unproven. Materialization
-cost scales with output size. Python bridge adds ~50ms subprocess
-overhead per operation.
+on scale, but performance at large scale is unproven. The repair
+loop's effectiveness may degrade at larger scale — more agents, more
+files, harder cross-cutting failures, repair rounds that compound.

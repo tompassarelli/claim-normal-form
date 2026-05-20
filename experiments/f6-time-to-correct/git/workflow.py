@@ -1,0 +1,47 @@
+from core import get_ticket, update_ticket, _run_hooks
+from typing import Optional
+
+VALID_TRANSITIONS = {
+    "open": ["in_progress", "closed"],
+    "in_progress": ["resolved", "open", "on_hold"],
+    "on_hold": ["in_progress", "open"],
+    "resolved": ["closed", "open"],
+    "closed": ["archived"],
+    "archived": [],
+}
+
+ACTIVE_STATUSES = ["open", "in_progress", "resolved"]
+TERMINAL_STATUSES = ["closed", "archived"]
+
+
+def is_valid_transition(from_status: str, to_status: str) -> bool:
+    return to_status in VALID_TRANSITIONS.get(from_status, [])
+
+
+def transition_ticket(ticket_id: str, new_status: str):
+    t = get_ticket(ticket_id)
+    if not is_valid_transition(t.status, new_status):
+        raise ValueError(f"Invalid transition: {t.status} -> {new_status}")
+    old_status = t.status
+    _run_hooks("pre_transition", ticket=t, old_status=old_status,
+               new_status=new_status)
+    t = update_ticket(ticket_id, status=new_status)
+    _run_hooks("post_transition", ticket=t, old_status=old_status,
+               new_status=new_status)
+    return t
+
+
+def archive_ticket(ticket_id: str):
+    return transition_ticket(ticket_id, "archived")
+
+
+def is_active(ticket) -> bool:
+    return ticket.status in ACTIVE_STATUSES
+
+
+def is_archived(ticket) -> bool:
+    return ticket.status == "archived"
+
+
+def get_available_transitions(ticket) -> list:
+    return VALID_TRANSITIONS.get(ticket.status, [])

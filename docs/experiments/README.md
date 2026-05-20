@@ -30,6 +30,7 @@ a maintained semantic index than against text files.
 | F3 | Live graph | [results](f3-live-graph/results.md) | **Sequential agents, accumulated graph. Git 7/14 (5 cross-cutting bugs). CNF 13/14 (0 cross-cutting bugs, 1 policy decision). Live graph pipeline validated.** |
 | F4 | Overlapping edits | [results](f4-overlap/results.md) | **Shared file modification + mid-run requirement. Git 18/21 (3 temporal failures, merge conflicts). CNF 21/21. Three failure modes: merge conflicts, hidden dependencies, temporal divergence.** |
 | F5 | Coordination curve | [results](f5-curve/results.md) | **8 agents, 28 tests, 3 tiers. Git 25/28 (3 temporal divergence). CNF 28/28. All git failures: on_hold mid-run requirement invisible to forked agents.** |
+| F6 | Time to correct | [results](f6-time-to-correct/results.md) | **Real agents, wall clock to 28/28. Git 276s (parallel + 1 repair round). CNF 500s (sequential, 0 repairs). Git 1.8x faster. Parallelism beats correctness at this scale.** |
 
 ## The arc
 
@@ -173,3 +174,13 @@ couldn't add it to workflow.VALID_TRANSITIONS — the merged
 system is internally inconsistent. Across F2-F5, CNF holds at
 100% (or 93% with one F3 policy decision) while git ranges from
 50% to 89%. The failures are always structural, never stochastic.
+
+F6 asked the wall-clock question: does correctness outweigh
+sequential cost? Real Claude Code agents (Sonnet), timed
+end-to-end. Git: parallel build (132s) + merge + test (22/28) +
+one repair round (83s) = 276s to 28/28. CNF: sequential build
+(354s) + test (28/28, zero repairs) = 500s. Git wins 1.8x. The
+repair loop was cheap — one agent, clear error messages, local
+fixes. Parallelism beats correctness when the repair is easy.
+The path forward is CNF parallelism (BEAM): concurrent agents
+writing to the shared graph, getting both speed and correctness.

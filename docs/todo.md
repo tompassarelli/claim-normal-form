@@ -511,6 +511,21 @@ while git ranges from 50% to 89%. All failures are structural.
 See `docs/experiments/f5-curve/results.md` and
 `docs/devlog/024-f5-coordination-curve.md`.
 
+## DONE: F6 — Time to Correct App
+
+Real Claude Code agents, wall clock to 28/28. Git 276s (parallel
+build + 1 repair round). CNF 500s (sequential build, 0 repairs).
+Git 1.8x faster. Parallelism beats correctness when the repair
+loop is cheap. The repair agent fixed 6 failures in 56s — clear
+error messages, local fixes, non-interfering.
+
+CNF needs its own parallelism to compete on wall clock. Sequential
+accumulation trades speed for correctness. At this scale, the
+speed cost exceeds the correctness benefit.
+
+See `docs/experiments/f6-time-to-correct/results.md` and
+`docs/devlog/025-f6-time-to-correct.md`.
+
 ## LATER: BEAM Runtime
 
 CNF is the data model. Datalog is the reasoning layer. BEAM is the
