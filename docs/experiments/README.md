@@ -27,6 +27,7 @@ a maintained semantic index than against text files.
 | E18 | Real baseline | [results](e18-real-baseline/results.md) | **Rope ties CNF 30/30. Regex 26/30. Substrate properties: 5/5 (rope: N/A).** |
 | E19 | Coordination cost | [results](e19-coordination/results.md) | **5 agents, 45 fns. Git rediscovery 56% (50 ops). CNF 0%. Git rename breaks downstream edit.** |
 | F2 | Parallel construction | [results](f2-claimdesk/results.md) | **5 agents build CRM app. Git 9/14 integration tests (5 cross-cutting bugs). CNF 14/14. Confirmed with real Claude Code agents.** |
+| F3 | Live graph | [results](f3-live-graph/results.md) | **Sequential agents, accumulated graph. Git 7/14 (5 cross-cutting bugs). CNF 13/14 (0 cross-cutting bugs, 1 policy decision). Live graph pipeline validated.** |
 
 ## The arc
 
@@ -134,3 +135,14 @@ is_archived, ACTIVE_STATUSES before writing code. Result: 0 bugs.
 First confirmed with scripted agents, then replicated with real Claude
 Code agents making genuine implementation decisions. The five failures
 are identical in both runs — they're structural, not stochastic.
+
+F3 validated the live graph pipeline. Instead of static context injected
+into prompts, each agent's code is parsed into the CNF graph after it
+finishes. The next agent queries the accumulated graph — 17 entities
+growing to 34 as modules are added. Same cross-cutting result: 5
+information-gap bugs in git, 0 in CNF. The CNF condition's single
+failure is a policy decision (permissions agent found archive but gave
+agents access — test expects admin-only), not an information gap. The
+live graph mechanism works: parse → checkpoint → restore → query → parse
+new code → re-checkpoint. This is the infrastructure for true concurrent
+multi-agent construction.

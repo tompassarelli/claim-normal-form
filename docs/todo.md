@@ -462,13 +462,29 @@ gap, not from agent randomness.
 Agent-generated code saved in `experiments/f2-claimdesk/real-agents/`.
 Full results: `docs/experiments/f2-claimdesk/results.md`.
 
-## NEXT: F3 — Full Real-Agent Construction
+## DONE: F3 — Live Graph Pipeline
 
-F2 proved the concept with a constrained setup (separate files, no
-shared modifications). The next step: agents that modify shared files,
-resolve conflicts, and build against a live-updating graph. True
-parallel construction where the CNF graph is the coordination layer,
-not just a read-only context provider.
+Sequential agents, accumulated graph. Each agent's code parsed into
+the CNF graph after writing; next agent queries the accumulated state.
+Graph grows from 17 to 34 entities across 4 modules.
+
+**Git 7/14 (5 cross-cutting bugs + 2 convention/spec issues).
+CNF 13/14 (0 cross-cutting bugs, 1 policy decision).**
+
+Cross-cutting result stable across F2 and F3: information-gap bugs
+appear in every git run and never in CNF. Live graph pipeline
+validated: parse → checkpoint → restore → query → parse new code.
+
+Agent outputs: `experiments/f3-live-graph/git/` and `cnf/`.
+Results: `docs/experiments/f3-live-graph/results.md`.
+
+## NEXT: F4 — Concurrent Construction with Shared Files
+
+F3 validated the sequential pipeline. The next step: agents that
+modify shared files concurrently, with the graph tracking entity-level
+changes and enabling merge at the entity level rather than the line
+level. True parallel construction where CNF is the coordination
+layer, not just a context provider.
 
 ## LATER: BEAM Runtime
 
