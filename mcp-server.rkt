@@ -970,46 +970,7 @@
                   'error (hasheq 'code -32601
                                  'message (format "Unknown method: ~a" method))))]))
 
-;; --- Read/Write lock (turnstile pattern) ---
-
-(struct rwlock (turnstile resource rmutex readers))
-
-(define (make-rwlock)
-  (rwlock (make-semaphore 1) (make-semaphore 1) (make-semaphore 1) (box 0)))
-
-(define (call-with-read-lock rwl thunk)
-  (semaphore-wait (rwlock-turnstile rwl))
-  (semaphore-post (rwlock-turnstile rwl))
-  (semaphore-wait (rwlock-rmutex rwl))
-  (define count (add1 (unbox (rwlock-readers rwl))))
-  (set-box! (rwlock-readers rwl) count)
-  (when (= count 1)
-    (semaphore-wait (rwlock-resource rwl)))
-  (semaphore-post (rwlock-rmutex rwl))
-  (with-handlers ([exn? (lambda (e) (rwlock-read-release! rwl) (raise e))])
-    (define result (thunk))
-    (rwlock-read-release! rwl)
-    result))
-
-(define (rwlock-read-release! rwl)
-  (semaphore-wait (rwlock-rmutex rwl))
-  (define count (sub1 (unbox (rwlock-readers rwl))))
-  (set-box! (rwlock-readers rwl) count)
-  (when (= count 0)
-    (semaphore-post (rwlock-resource rwl)))
-  (semaphore-post (rwlock-rmutex rwl)))
-
-(define (call-with-write-lock rwl thunk)
-  (semaphore-wait (rwlock-turnstile rwl))
-  (semaphore-wait (rwlock-resource rwl))
-  (with-handlers ([exn? (lambda (e)
-                   (semaphore-post (rwlock-resource rwl))
-                   (semaphore-post (rwlock-turnstile rwl))
-                   (raise e))])
-    (define result (thunk))
-    (semaphore-post (rwlock-resource rwl))
-    (semaphore-post (rwlock-turnstile rwl))
-    result))
+;; --- MVCC (snapshot isolation for reads, serialized writes) ---
 
 (define read-only-tools
   '("query" "inspect" "resolve_symbol" "claims_where" "find_by"
@@ -1022,8 +983,9 @@
 
 (define (run-daemon port-num)
   (define listener (tcp-listen port-num 5 #t))
-  (eprintf "cnf-daemon: listening on port ~a (read/write locking)\n" port-num)
-  (define lock (make-rwlock))
+  (eprintf "cnf-daemon: listening on port ~a (MVCC)\n" port-num)
+  (define write-sem (make-semaphore 1))
+  (define committed (box (snapshot-ctx)))
 
   (let accept-loop ()
     (define-values (in out) (tcp-accept listener))
@@ -1043,15 +1005,21 @@
               (define tool-name
                 (and (equal? (hash-ref msg 'method #f) "tools/call")
                      (hash-ref (hash-ref msg 'params (hasheq)) 'name #f)))
-              (define use-read-lock? (and tool-name (read-only-tool? tool-name)))
-              (define locker (if use-read-lock? call-with-read-lock call-with-write-lock))
-              (locker lock
-                (lambda ()
-                  (define response (make-response msg))
-                  (when response
-                    (write-json response out)
-                    (write-char #\newline out)
-                    (flush-output out))))
+              (if (and tool-name (read-only-tool? tool-name))
+                  (parameterize ([current-ctx (unbox committed)])
+                    (define response (make-response msg))
+                    (when response
+                      (write-json response out)
+                      (write-char #\newline out)
+                      (flush-output out)))
+                  (call-with-semaphore write-sem
+                    (lambda ()
+                      (define response (make-response msg))
+                      (when response
+                        (write-json response out)
+                        (write-char #\newline out)
+                        (flush-output out))
+                      (set-box! committed (snapshot-ctx)))))
               (loop)])))
        (close-input-port in)
        (close-output-port out)))

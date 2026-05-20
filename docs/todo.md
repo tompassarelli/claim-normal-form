@@ -237,19 +237,22 @@ Daemon mode supports multiple TCP clients. Three pieces completed:
    read/write locking or MVCC. Not needed yet but could be a big unlock
    for real multi-agent workflows.
 
-## DONE: Read/Write Locking
+## DONE: MVCC (Snapshot Isolation)
 
-Replaced the global semaphore in daemon mode with a turnstile-based
-readers-writer lock. Multiple readers (queries, inspect, status, etc.)
-run concurrently. Writers (mutations, parse, define rules) get exclusive
-access. Writer blocks new readers and waits for existing readers to finish.
+Replaced the global semaphore and read/write lock in daemon mode with
+MVCC. `snapshot-ctx` creates an independent deep copy of the claim
+graph (all 13 struct hashes + mutable ext values). Daemon maintains a
+"committed snapshot" that readers use without any lock.
 
-11 read-only tools: query, inspect, resolve_symbol, claims_where,
-find_by, lookup, render, status, list_rules, tx_log, current_tx_seq.
-All others use write lock. 6 rwlock-specific tests.
+- **Readers**: `parameterize` with committed snapshot, no lock needed.
+  Multiple readers run truly concurrently with zero contention.
+- **Writers**: serialized via semaphore on the live context. After each
+  write, a new snapshot is created and published for future readers.
+- **Isolation**: readers that started before a write complete on their
+  snapshot unaffected. New readers see the write's effects.
 
-Full MVCC (snapshot isolation for concurrent writers) remains a LATER
-item — this covers the common case of parallel reads.
+11 read-only tools run lock-free. Writers serialize. 6 MVCC tests
+verify snapshot independence, matview preservation, concurrent reads.
 
 ## DONE: Incremental Parse
 

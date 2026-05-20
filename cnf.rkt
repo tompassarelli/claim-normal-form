@@ -38,7 +38,8 @@
          claims-since
          current-tx-seq
          tx-agent
-         claims-visible-as-of)
+         claims-visible-as-of
+         snapshot-ctx)
 
 ;; --- Context ---
 
@@ -428,6 +429,33 @@
    (box 0) (make-hash) (make-hash) (make-hash) (make-hash)
    (make-hash) (make-hash) (make-hash) (make-hash) (make-hash)
    (box #f) (make-hash) (make-hash)))
+
+(define (snapshot-ctx)
+  (define ctx (current-ctx))
+  (define new-ext (hash-copy (cnf-ctx-ext ctx)))
+  (for ([key '(matview-db matview-prov matview-claim-rev matview-ent-to-resolved
+               claim-to-tx tx-to-claims tx-meta builtins primitives rule-entities)])
+    (define val (hash-ref new-ext key #f))
+    (when (and val (hash? val) (not (immutable? val)))
+      (hash-set! new-ext key (hash-copy val))))
+  (for ([key '(tx-counter current-tx)])
+    (define val (hash-ref new-ext key #f))
+    (when (and val (box? val))
+      (hash-set! new-ext key (box (unbox val)))))
+  (cnf-ctx
+   (box (unbox (cnf-ctx-next-id ctx)))
+   (hash-copy (cnf-ctx-objects ctx))
+   (hash-copy (cnf-ctx-values ctx))
+   (hash-copy (cnf-ctx-val-intern ctx))
+   (hash-copy (cnf-ctx-claims ctx))
+   (hash-copy (cnf-ctx-idx-by-l ctx))
+   (hash-copy (cnf-ctx-idx-by-p ctx))
+   (hash-copy (cnf-ctx-idx-by-r ctx))
+   (hash-copy (cnf-ctx-idx-by-lp ctx))
+   (hash-copy (cnf-ctx-idx-by-pr ctx))
+   (box (unbox (cnf-ctx-symbol-pred-id ctx)))
+   new-ext
+   (hash-copy (cnf-ctx-superseded ctx))))
 
 (define (export-store)
   (define ctx (current-ctx))

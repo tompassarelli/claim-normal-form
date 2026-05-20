@@ -374,9 +374,11 @@ tx_log()       # see interleaved agent transactions
 
 ### Daemon mode
 
-The daemon listens on TCP, serializes writes, and allows concurrent
-reads (read/write locking). Multiple Claude Code instances can connect
-via bridge mode and share the same claim graph.
+The daemon uses MVCC (multi-version concurrency control). Readers get
+a snapshot of the committed state and run without any lock — multiple
+queries execute concurrently with zero contention. Writers serialize
+and publish a new snapshot on commit. Multiple Claude Code instances
+can connect via bridge mode and share the same claim graph.
 
 ```bash
 # Terminal 1: start daemon

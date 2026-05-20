@@ -1,164 +1,119 @@
 #lang racket
 
-(require rackunit)
+(require rackunit
+         "cnf.rkt"
+         "datalog.rkt"
+         "eval.rkt"
+         "graph.rkt"
+         "schema.rkt"
+         "lang.rkt")
 
-;; Inline the rwlock implementation for testing
-(struct rwlock (turnstile resource rmutex readers))
+;; --- MVCC Tests ---
+;; Tests for snapshot isolation: readers see consistent state,
+;; writers don't block readers, snapshots are independent.
 
-(define (make-rwlock)
-  (rwlock (make-semaphore 1) (make-semaphore 1) (make-semaphore 1) (box 0)))
+(define (fresh!)
+  (reset-store!)
+  (setup-eval!)
+  (setup-graph!)
+  (setup-schema!)
+  (setup-rule-predicates!)
+  (setup-lang!)
+  (materialize!))
 
-(define (call-with-read-lock rwl thunk)
-  (semaphore-wait (rwlock-turnstile rwl))
-  (semaphore-post (rwlock-turnstile rwl))
-  (semaphore-wait (rwlock-rmutex rwl))
-  (define count (add1 (unbox (rwlock-readers rwl))))
-  (set-box! (rwlock-readers rwl) count)
-  (when (= count 1)
-    (semaphore-wait (rwlock-resource rwl)))
-  (semaphore-post (rwlock-rmutex rwl))
-  (with-handlers ([exn? (lambda (e) (rwlock-read-release! rwl) (raise e))])
-    (define result (thunk))
-    (rwlock-read-release! rwl)
-    result))
-
-(define (rwlock-read-release! rwl)
-  (semaphore-wait (rwlock-rmutex rwl))
-  (define count (sub1 (unbox (rwlock-readers rwl))))
-  (set-box! (rwlock-readers rwl) count)
-  (when (= count 0)
-    (semaphore-post (rwlock-resource rwl)))
-  (semaphore-post (rwlock-rmutex rwl)))
-
-(define (call-with-write-lock rwl thunk)
-  (semaphore-wait (rwlock-turnstile rwl))
-  (semaphore-wait (rwlock-resource rwl))
-  (with-handlers ([exn? (lambda (e)
-                   (semaphore-post (rwlock-resource rwl))
-                   (semaphore-post (rwlock-turnstile rwl))
-                   (raise e))])
-    (define result (thunk))
-    (semaphore-post (rwlock-resource rwl))
-    (semaphore-post (rwlock-turnstile rwl))
-    result))
-
-;; 1. Multiple readers run concurrently
+;; 1. snapshot-ctx creates independent copy
+(fresh!)
 (let ()
-  (define rwl (make-rwlock))
-  (define started (make-channel))
+  (define fns (parse-program! "(defn foo [a b]\n  (+ a b))"))
+  (define snap (snapshot-ctx))
+  (define claims-before (length (claims-where)))
+  (parse-program! "(defn bar [x y]\n  (* x y))")
+  (define claims-after (length (claims-where)))
+  (check-true (> claims-after claims-before))
+  (parameterize ([current-ctx snap])
+    (check-equal? (length (claims-where)) claims-before))
+  (displayln "PASS 1 — snapshot is independent of live state"))
+
+;; 2. snapshot preserves matview queries
+(fresh!)
+(let ()
+  (define fns (parse-program!
+    "(defn helper [a b]\n  (+ a b))\n\n(defn caller [x y]\n  (helper x y))"))
+  (define snap (snapshot-ctx))
+  (define live-deps (query (fn-depends-on (? a) (? b))))
+  (parameterize ([current-ctx snap])
+    (define snap-deps (query (fn-depends-on (? a) (? b))))
+    (check-equal? (length snap-deps) (length live-deps)))
+  (displayln "PASS 2 — snapshot preserves matview queries"))
+
+;; 3. writes on live ctx don't affect snapshot queries
+(fresh!)
+(let ()
+  (define fns (parse-program!
+    "(defn base [a b]\n  (+ a b))"))
+  (define snap (snapshot-ctx))
+  (add-function! "(defn caller [x y]\n  (base x y))")
+  (define live-deps (query (fn-depends-on (? a) (? b))))
+  (check-equal? (length live-deps) 1)
+  (parameterize ([current-ctx snap])
+    (define snap-deps (query (fn-depends-on (? a) (? b))))
+    (check-equal? (length snap-deps) 0))
+  (displayln "PASS 3 — writes don't affect snapshot queries"))
+
+;; 4. snapshot preserves transaction data
+(fresh!)
+(let ()
+  (ctx-set! 'current-agent "agent-A")
+  (define fns (parse-program! "(defn foo [a b]\n  (+ a b))"))
+  (define snap (snapshot-ctx))
+  (define live-seq (current-tx-seq))
+  (ctx-set! 'current-agent "agent-B")
+  (parse-program! "(defn bar [x y]\n  (* x y))")
+  (check-true (> (current-tx-seq) live-seq))
+  (parameterize ([current-ctx snap])
+    (check-equal? (current-tx-seq) live-seq))
+  (displayln "PASS 4 — snapshot preserves transaction data"))
+
+;; 5. multiple snapshots are independent
+(fresh!)
+(let ()
+  (parse-program! "(defn a [x y]\n  (+ x y))")
+  (define snap1 (snapshot-ctx))
+  (parse-program! "(defn b [x y]\n  (* x y))")
+  (define snap2 (snapshot-ctx))
+  (parse-program! "(defn c [x y]\n  (- x y))")
+  (define live-claims (length (claims-where)))
+  (parameterize ([current-ctx snap1])
+    (define s1-claims (length (claims-where)))
+    (check-true (< s1-claims live-claims)))
+  (parameterize ([current-ctx snap2])
+    (define s2-claims (length (claims-where)))
+    (parameterize ([current-ctx snap1])
+      (check-true (< (length (claims-where)) s2-claims))))
+  (displayln "PASS 5 — multiple snapshots are independent"))
+
+;; 6. concurrent reads on snapshot (thread safety)
+(fresh!)
+(let ()
+  (define fns (parse-program!
+    (string-append
+      "(defn f1 [a b]\n  (+ a b))\n\n"
+      "(defn f2 [a b]\n  (* a b))\n\n"
+      "(defn f3 [x y]\n  (f1 x y))\n\n"
+      "(defn f4 [x y]\n  (f2 x y))")))
+  (define snap (snapshot-ctx))
   (define results (make-channel))
-  (for ([i (in-range 5)])
+  (for ([i (in-range 10)])
     (thread
      (lambda ()
-       (call-with-read-lock rwl
-         (lambda ()
-           (channel-put started i)
-           (sleep 0.05)
-           (channel-put results i))))))
-  (for ([i (in-range 5)])
-    (channel-get started))
-  (define all-started (current-inexact-milliseconds))
-  (for ([i (in-range 5)])
-    (channel-get results))
-  (define elapsed (- (current-inexact-milliseconds) all-started))
-  (check-true (< elapsed 200) "readers should run concurrently, not sequentially")
-  (displayln "PASS 1 — multiple readers run concurrently"))
-
-;; 2. Writer gets exclusive access
-(let ()
-  (define rwl (make-rwlock))
-  (define log '())
-  (define log-mutex (make-semaphore 1))
-  (define (log! msg)
-    (call-with-semaphore log-mutex
-      (lambda () (set! log (cons msg log)))))
-  (define done (make-channel))
-  (call-with-write-lock rwl
-    (lambda ()
-      (define t
-        (thread
-         (lambda ()
-           (call-with-write-lock rwl
-             (lambda ()
-               (log! 'writer-2-ran)
-               (channel-put done #t))))))
-      (sleep 0.05)
-      (log! 'writer-1-ran)))
-  (channel-get done)
-  (check-equal? (reverse log) '(writer-1-ran writer-2-ran))
-  (displayln "PASS 2 — writer gets exclusive access"))
-
-;; 3. Writer blocks new readers
-(let ()
-  (define rwl (make-rwlock))
-  (define log '())
-  (define log-mutex (make-semaphore 1))
-  (define (log! msg)
-    (call-with-semaphore log-mutex
-      (lambda () (set! log (cons msg log)))))
-  (define done (make-channel))
-  (call-with-write-lock rwl
-    (lambda ()
-      (thread
-       (lambda ()
-         (call-with-read-lock rwl
-           (lambda ()
-             (log! 'reader-ran)
-             (channel-put done #t)))))
-      (sleep 0.05)
-      (log! 'writer-ran)))
-  (channel-get done)
-  (check-equal? (reverse log) '(writer-ran reader-ran))
-  (displayln "PASS 3 — writer blocks new readers"))
-
-;; 4. Writer waits for existing readers
-(let ()
-  (define rwl (make-rwlock))
-  (define log '())
-  (define log-mutex (make-semaphore 1))
-  (define (log! msg)
-    (call-with-semaphore log-mutex
-      (lambda () (set! log (cons msg log)))))
-  (define reader-started (make-channel))
-  (define done (make-channel))
-  (thread
-   (lambda ()
-     (call-with-read-lock rwl
-       (lambda ()
-         (channel-put reader-started #t)
-         (sleep 0.1)
-         (log! 'reader-done)))))
-  (channel-get reader-started)
-  (thread
-   (lambda ()
-     (call-with-write-lock rwl
-       (lambda ()
-         (log! 'writer-done)
-         (channel-put done #t)))))
-  (channel-get done)
-  (check-equal? (reverse log) '(reader-done writer-done))
-  (displayln "PASS 4 — writer waits for existing readers"))
-
-;; 5. Read lock survives exceptions
-(let ()
-  (define rwl (make-rwlock))
-  (check-exn exn:fail?
-    (lambda ()
-      (call-with-read-lock rwl
-        (lambda () (error "boom")))))
-  (check-equal? (unbox (rwlock-readers rwl)) 0)
-  (call-with-read-lock rwl (lambda () 'ok))
-  (displayln "PASS 5 — read lock survives exceptions"))
-
-;; 6. Write lock survives exceptions
-(let ()
-  (define rwl (make-rwlock))
-  (check-exn exn:fail?
-    (lambda ()
-      (call-with-write-lock rwl
-        (lambda () (error "boom")))))
-  (call-with-write-lock rwl (lambda () 'ok))
-  (displayln "PASS 6 — write lock survives exceptions"))
+       (parameterize ([current-ctx snap])
+         (define deps (query (fn-depends-on (? a) (? b))))
+         (channel-put results (length deps))))))
+  (define counts
+    (for/list ([i (in-range 10)])
+      (channel-get results)))
+  (check-true (apply = counts))
+  (displayln "PASS 6 — concurrent reads on snapshot produce consistent results"))
 
 (displayln "")
-(displayln "All rwlock tests passed.")
+(displayln "All MVCC tests passed.")
