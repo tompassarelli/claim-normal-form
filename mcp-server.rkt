@@ -37,7 +37,8 @@
   (setup-eval!)
   (setup-graph!)
   (setup-schema!)
-  (setup-lang!))
+  (setup-lang!)
+  (materialize!))
 
 ;; --- S-expression query parsing ---
 

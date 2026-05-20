@@ -98,7 +98,11 @@
   (index-claim! id l p r)
   (define sup-pred (ctx-ref 'supersedes-pred-id #f))
   (when (and sup-pred (equal? p sup-pred))
-    (hash-set! (cnf-ctx-superseded ctx) r #t))
+    (hash-set! (cnf-ctx-superseded ctx) r #t)
+    (for ([hook (in-list (ctx-ref 'on-supersede-hooks '()))])
+      (hook r)))
+  (for ([hook (in-list (ctx-ref 'on-claim-hooks '()))])
+    (hook id l p r))
   id)
 
 ;; --- Bootstrap ---

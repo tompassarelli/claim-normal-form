@@ -44,50 +44,74 @@
   (define-values (fns parse-ms) (time-ms (lambda () (parse-program! source))))
   (define total-objects (length (all-objects)))
   (define total-claims (length (claims-where)))
-  (printf "  Parse:           ~a ms  (~a objects, ~a claims)\n"
+  (printf "  Parse:            ~a ms  (~a objects, ~a claims)\n"
           (~r parse-ms #:precision 1) total-objects total-claims)
 
-  ;; 2. Dependency query
+  ;; 2. Dependency query (no materialization — full fixpoint)
   (define-values (deps dep-ms)
     (time-ms (lambda () (query (fn-depends-on (? caller) (? callee))))))
-  (printf "  Dependency query: ~a ms  (~a deps found)\n"
+  (printf "  Dep query (cold): ~a ms  (~a deps found)\n"
           (~r dep-ms #:precision 1) (length deps))
 
-  ;; 3. Rename + render one (agent scenario: change name, check one call site)
-  (define-values (_r1 rename-one-ms)
-    (time-ms (lambda ()
-      (rename! (first fns) "renamed-f0")
-      (render-fn (last fns)))))
-  (printf "  Rename+render 1: ~a ms\n" (~r rename-one-ms #:precision 1))
+  ;; 3. Materialize, then query again (cache hit)
+  (define-values (_m1 mat-ms) (time-ms materialize!))
+  (define-values (deps2 dep2-ms)
+    (time-ms (lambda () (query (fn-depends-on (? caller) (? callee))))))
+  (printf "  Materialize:      ~a ms\n" (~r mat-ms #:precision 1))
+  (printf "  Dep query (hit):  ~a ms  (~a deps)\n"
+          (~r dep2-ms #:precision 1) (length deps2))
 
-  ;; 4. Render all
+  ;; 4. Rename (invalidates), then query (recompute + cache), then query (hit)
+  (define-values (_r0 rename-ms)
+    (time-ms (lambda () (rename! (first fns) "renamed-f0"))))
+  (define-values (deps3 dep3-ms)
+    (time-ms (lambda () (query (fn-depends-on (? caller) (? callee))))))
+  (define-values (deps4 dep4-ms)
+    (time-ms (lambda () (query (fn-depends-on (? caller) (? callee))))))
+  (printf "  Rename:           ~a ms\n" (~r rename-ms #:precision 1))
+  (printf "  Dep after rename: ~a ms  (recompute)\n" (~r dep3-ms #:precision 1))
+  (printf "  Dep again:        ~a ms  (cache hit)\n" (~r dep4-ms #:precision 1))
+
+  ;; 5. Materialized parse: materialize first, then parse (incremental)
+  (reset-store!)
+  (setup-eval!)
+  (setup-graph!)
+  (setup-lang!)
+  (materialize!)
+  (define-values (fns2 parse2-ms) (time-ms (lambda () (parse-program! source))))
+  (define-values (deps5 dep5-ms)
+    (time-ms (lambda () (query (fn-depends-on (? caller) (? callee))))))
+  (printf "  Parse (incr):     ~a ms  (views maintained during parse)\n"
+          (~r parse2-ms #:precision 1))
+  (printf "  Dep query (incr): ~a ms  (~a deps)\n"
+          (~r dep5-ms #:precision 1) (length deps5))
+
+  ;; 6. Render
   (define-values (_r2 render-all-ms)
-    (time-ms (lambda () (render-program fns))))
+    (time-ms (lambda () (render-program fns2))))
   (printf "  Render all:       ~a ms\n" (~r render-all-ms #:precision 1))
 
-  ;; 5. Text baseline: string-replace across all source strings
-  (define rendered-sources (map render-fn fns))
+  ;; 7. Text baselines
+  (define rendered-sources (map render-fn fns2))
   (define-values (_r3 text-ms)
     (time-ms (lambda ()
       (for/list ([s (in-list rendered-sources)])
-        (string-replace s "renamed-f0" "rerenamed-f0")))))
-  (printf "  Text replace all: ~a ms\n" (~r text-ms #:precision 1))
-
-  ;; 6. Text baseline: regex search for dependencies (grep equivalent)
+        (string-replace s "f0" "renamed-f0")))))
   (define-values (_r4 grep-ms)
     (time-ms (lambda ()
       (for/list ([s (in-list rendered-sources)])
         (regexp-match* #rx"\\(f[0-9]+ " s)))))
+  (printf "  Text replace all: ~a ms\n" (~r text-ms #:precision 1))
   (printf "  Text grep deps:   ~a ms\n" (~r grep-ms #:precision 1))
 
   (printf "  ---\n")
-  (printf "  Rename+render-1 / text-replace-all = ~ax\n"
-          (if (> text-ms 0)
-              (~r (/ rename-one-ms text-ms) #:precision 2)
-              "N/A"))
-  (printf "  Dep query / text-grep = ~ax\n"
+  (printf "  Dep query speedup (cold vs cache hit): ~ax\n"
+          (if (> dep2-ms 0)
+              (~r (/ dep-ms dep2-ms) #:precision 1)
+              "∞"))
+  (printf "  Dep query (incr) vs text grep: ~ax\n"
           (if (> grep-ms 0)
-              (~r (/ dep-ms grep-ms) #:precision 2)
+              (~r (/ dep5-ms grep-ms) #:precision 2)
               "N/A")))
 
 (displayln "")
@@ -107,10 +131,9 @@
 (displayln "  Notes")
 (displayln "================================================================")
 (displayln "")
-(displayln "- 'Rename+render 1' is the agent scenario: rename a function,")
-(displayln "  verify one call site. CNF rename is O(1), rendering is O(fn).")
-(displayln "- 'Text replace all' must scan every source string — O(N).")
-(displayln "- Datalog dep query uses semi-naive fixpoint. Materialized")
-(displayln "  views would make it competitive with grep at scale.")
-(displayln "- The index-aware engine avoids full EDB copy and uses claim")
-(displayln "  indexes during joins (idx-by-l, idx-by-lp, idx-by-pr).")
+(displayln "- 'Dep query (hit)' reads from materialized views — O(1).")
+(displayln "- 'Parse (incr)' maintains views live during parsing via")
+(displayln "  delta propagation. Query after parse is a cache hit.")
+(displayln "- Supersession (rename) invalidates views. Next query recomputes.")
+(displayln "- The index-aware engine uses claim hash indexes during joins.")
+(displayln "- CNF rename is O(1). Rendering is O(fn-size).")

@@ -11,7 +11,9 @@
          reset-rules!
          supersedes-pred-id
          set-supersedes-pred!
-         current-claims-where)
+         current-claims-where
+         materialize!
+         invalidate-views!)
 
 ;; Datalog over CNF — semi-naive evaluation with index-aware joins.
 ;;
@@ -48,7 +50,8 @@
   (filter (lambda (c) (not (superseded? (first c)))) all))
 
 (define (reset-rules!)
-  (ctx-set! 'rules '()))
+  (ctx-set! 'rules '())
+  (ctx-set! 'matview-valid? #f))
 
 ;; --- Syntax ---
 
@@ -362,14 +365,123 @@
       (resolve-atom-literals a)
       a))
 
+(define (resolve-current-rules)
+  (for/list ([r (in-list (ctx-ref 'rules '()))])
+    (dl-rule (dl-rule-head r)
+             (map resolve-if-edb (dl-rule-body r)))))
+
 (define (run-query body-atoms)
   (define resolved-query (map resolve-if-edb body-atoms))
-  (define resolved-rules
-    (for/list ([r (in-list (ctx-ref 'rules '()))])
-      (dl-rule (dl-rule-head r)
-               (map resolve-if-edb (dl-rule-body r)))))
-  (define db (fixpoint-semi-naive resolved-rules))
+  (define cached-db (ctx-ref 'matview-db #f))
+  (define db
+    (cond
+      [(and cached-db (ctx-ref 'matview-valid? #f))
+       cached-db]
+      [(ctx-ref 'matview-hooks-registered? #f)
+       (define resolved-rules (resolve-current-rules))
+       (define fresh-db (fixpoint-semi-naive resolved-rules))
+       (ctx-set! 'matview-db fresh-db)
+       (ctx-set! 'matview-resolved-rules resolved-rules)
+       (ctx-set! 'matview-valid? #t)
+       fresh-db]
+      [else
+       (fixpoint-semi-naive (resolve-current-rules))]))
   (eval-body db resolved-query (hasheq)))
+
+;; --- Materialized views ---
+;;
+;; materialize! runs the initial fixpoint, caches results, and registers
+;; hooks on claim! so the cache is maintained incrementally on insertion
+;; and invalidated on supersession.
+;;
+;; Insertion: each new claim produces new EDB tuples. We delta-propagate
+;; through rules (EDB→IDB, then IDB→IDB) to update derived facts
+;; without re-running the full fixpoint.
+;;
+;; Supersession: invalidates the cache. Next query recomputes and re-caches.
+
+(define (materialize!)
+  (define resolved-rules (resolve-current-rules))
+  (define db (fixpoint-semi-naive resolved-rules))
+  (ctx-set! 'matview-db db)
+  (ctx-set! 'matview-resolved-rules resolved-rules)
+  (ctx-set! 'matview-valid? #t)
+  (unless (ctx-ref 'matview-hooks-registered? #f)
+    (ctx-set! 'on-claim-hooks
+      (cons on-new-claim-hook! (ctx-ref 'on-claim-hooks '())))
+    (ctx-set! 'on-supersede-hooks
+      (cons (lambda (_) (ctx-set! 'matview-valid? #f))
+            (ctx-ref 'on-supersede-hooks '())))
+    (ctx-set! 'matview-hooks-registered? #t)))
+
+(define (invalidate-views!)
+  (ctx-set! 'matview-valid? #f))
+
+(define (on-new-claim-hook! cid l p r)
+  (define db (ctx-ref 'matview-db #f))
+  (when (and db (ctx-ref 'matview-valid? #f))
+    (define rules (ctx-ref 'matview-resolved-rules '()))
+    (propagate-edb-delta! db rules
+      (list (list 'triple l p r)
+            (list 'claim cid l p r)
+            (list 'current-triple l p r)
+            (list 'current-claim cid l p r)))))
+
+(define (propagate-edb-delta! db rules new-edb-entries)
+  (define new-idb (make-hash))
+
+  (for ([r (in-list rules)])
+    (define body (dl-rule-body r))
+    (for ([i (in-range (length body))])
+      (define a (list-ref body i))
+      (when (edb-rel? (atom-rel a))
+        (for ([entry (in-list new-edb-entries)]
+              #:when (eq? (car entry) (atom-rel a)))
+          (define tuple (cdr entry))
+          (define subst (match-tuple (atom-args a) tuple (hasheq)))
+          (when subst
+            (define other-body (append (take body i) (drop body (add1 i))))
+            (for ([s (in-list (eval-body-full db other-body subst))])
+              (define d (instantiate-head r s))
+              (define rel (car d))
+              (define tup (cdr d))
+              (unless (member tup (hash-ref db rel '()))
+                (unless (member tup (hash-ref new-idb rel '()))
+                  (hash-update! new-idb rel
+                    (lambda (old) (cons tup old)) '())))))))))
+
+  (unless (hash-empty? new-idb)
+    (for ([(rel tuples) (in-hash new-idb)])
+      (hash-set! db rel (append tuples (hash-ref db rel '()))))
+    (propagate-idb-delta! db rules new-idb)))
+
+(define (propagate-idb-delta! db rules delta-idb)
+  (define new-idb (make-hash))
+
+  (for ([r (in-list rules)])
+    (define body (dl-rule-body r))
+    (define positions (idb-body-positions body))
+    (for ([pos (in-list positions)])
+      (define a (list-ref body pos))
+      (define delta-tuples (hash-ref delta-idb (atom-rel a) #f))
+      (when delta-tuples
+        (for ([dt (in-list delta-tuples)])
+          (define subst (match-tuple (atom-args a) dt (hasheq)))
+          (when subst
+            (define other-body (append (take body pos) (drop body (add1 pos))))
+            (for ([s (in-list (eval-body-full db other-body subst))])
+              (define d (instantiate-head r s))
+              (define rel (car d))
+              (define tup (cdr d))
+              (unless (member tup (hash-ref db rel '()))
+                (unless (member tup (hash-ref new-idb rel '()))
+                  (hash-update! new-idb rel
+                    (lambda (old) (cons tup old)) '())))))))))
+
+  (unless (hash-empty? new-idb)
+    (for ([(rel tuples) (in-hash new-idb)])
+      (hash-set! db rel (append tuples (hash-ref db rel '()))))
+    (propagate-idb-delta! db rules new-idb)))
 
 (define (show-results results)
   (if (null? results)

@@ -254,8 +254,12 @@ Run `racket lang-demo.rkt` for the full thesis demonstration.
 ## Performance
 
 The Datalog engine uses **semi-naive evaluation** with
-**index-aware base relation dispatch**:
+**materialized views** and **index-aware base relation dispatch**:
 
+- **Materialized views**: `materialize!` caches all derived facts.
+  New claims delta-propagate through rules incrementally — views
+  stay current without re-running the fixpoint. Supersession
+  invalidates affected views; next query recomputes and re-caches.
 - **Semi-naive fixpoint**: EDB-only rules fire once. IDB rules
   iterate with delta restriction — each iteration only considers
   rule variants where at least one IDB body atom uses new facts
@@ -266,32 +270,26 @@ The Datalog engine uses **semi-naive evaluation** with
 - **Maintained supersession**: `current-claims-where` is O(matching)
   not O(all supersession claims).
 
-Incremental recompute touches only the affected subgraph:
-
-```
-105 expressions (5-deep chain + 100 independent)
-Full build:        ~1100 ms
-Incremental (5):   ~90 ms   (12x faster, 100 nodes untouched)
-```
-
-Run `racket bench.rkt` to reproduce.
-
 Agent-oriented operations at scale:
 
 ```
 200 functions (chain dependencies)
-Rename + render 1 fn:  < 0.1 ms  (O(1) — constant regardless of N)
-Render all 200:        ~3 ms
-Dependency query:      ~39 ms   (Datalog semi-naive fixpoint)
-Text string-replace:   ~0.1 ms  (for comparison)
+Dep query (cold):     ~67 ms   (full fixpoint, no cache)
+Dep query (cache):    ~0 ms    (materialized view hit — 4000x faster)
+Parse (incremental):  ~21 ms   (views maintained live during parse)
+Dep query after parse: 0 ms    (already computed — beats grep)
+Rename + render 1:    < 0.1 ms (O(1))
+Render all 200:       ~3 ms
+Text grep:            ~0.1 ms
 ```
 
 Run `racket engine-bench.rkt` to reproduce.
 
 **Honest limitations:**
-- Each query still recomputes all derived facts from scratch
-  (no materialized views). Semi-naive avoids redundant
-  re-derivation within a fixpoint but doesn't cache across queries.
+- Supersession (rename, update, retract) invalidates materialized
+  views. The next query after a supersession event pays the full
+  fixpoint cost. Provenance-tracked deletion would make this
+  O(delta) too.
 - The incremental win comes from evaluating fewer steps (5 instead
   of 105), not from faster individual steps.
 - Dependency queries via Datalog are slower than grep for simple
