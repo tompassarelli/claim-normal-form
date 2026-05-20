@@ -149,20 +149,19 @@ re-analysis. The next test needs conditions that expose the real
 advantage: larger codebase, emergent questions, mutations.
 See `docs/experiments/e8-new-interface/`.
 
-## NOW: E9 — The Evolving Codebase
+## DONE: E9 — Accumulated Knowledge at Scale
 
-E5–E8 tested the wrong conditions: small, stable, all-questions-known.
-Text agents front-load everything into one Python script and win.
+50 functions, 4 layers, 81 edges, 7 tasks with agent-initiated rename.
+CNF: 10 MCP calls, ~136s. Text: ~6 calls, ~124s. Text wins 1.7x.
 
-E9 tests the conditions where CNF's structural properties matter:
-sequential task revelation (no front-loading), external mutations
-between tasks (forces re-analysis or proves incremental update),
-50+ functions (scale), and rule evolution (capability gap).
+Closest result yet (was 5.3x in E5). Gap narrowing: 5.3x → 2.7x → 1.7x.
+Marginal cost converges to ~1 call/task for both after setup. The
+remaining gap is setup cost (rule definitions vs front-loaded Python).
 
-8 rounds, 3 mutations, 50→70 functions. Both agents answer same
-questions about evolving code. The prediction: text costs ~constant
-per round (re-analyze each time), CNF costs drop after Round 1
-(matview absorbs mutations). Design: `docs/experiments/e9-evolving-codebase/`.
+The missing piece: incremental parse. Without it, mutations require
+reset + full reparse, destroying accumulated rules. With it, mutations
+flow through the claim graph and matviews auto-update — the scenario
+where CNF should decisively win. Results: `docs/experiments/e9-evolving-codebase/`.
 
 ## LATER: Real Codebase Demo
 

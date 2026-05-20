@@ -15,6 +15,7 @@ a maintained semantic index than against text files.
 | E6 | Multi-round arena | [results](e6-multi-round/results.md) | Text wins total (12 vs 32). CNF wins tasks 2-5 (5 vs 7). |
 | E7 | Interface proof | [results](e7-interface-proof/results.md) | **42 calls → 7.** Schema + batch + symbols = 6x reduction. |
 | E8 | New interface arena | [results](e8-new-interface/results.md) | CNF 32→14 calls. Text also evolved: 12→3. Text wins 4.7x. |
+| E9 | Evolving codebase | [results](e9-evolving-codebase/results.md) | 50 fn, 7 tasks. CNF 10 vs text ~6. Gap narrows to 1.7x. |
 
 ## The arc
 
@@ -34,5 +35,10 @@ E7 proved the interface fix works: same task, 7 calls instead of 42.
 E8 ran the real rematch: CNF dropped from 32 to 14 calls, but the
 text agent also got smarter — from 12 to 3 calls by front-loading
 all analysis into one Python script. Text wins when all questions are
-known upfront. CNF wins in the incremental-questions scenario (1-2
-calls per new question vs re-analysis).
+known upfront.
+
+E9 scaled to 50 functions and 7 tasks with an agent-initiated rename.
+CNF 10 calls vs text ~6. The 1.7x gap (down from 5.3x in E5) is
+the closest yet. Marginal cost converges to ~1 call/task for both
+approaches — the remaining gap is setup cost. The thesis that remains
+unvalidated: incremental parse after external mutations.
