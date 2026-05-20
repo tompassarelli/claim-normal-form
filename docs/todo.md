@@ -1,35 +1,38 @@
 # CNF Roadmap
 
-## NOW: Agent Interface (MCP Server)
+## DONE: Agent Interface (MCP Server)
 
-Expose CNF operations as MCP tools so an AI agent can use the claim
-graph as its codebase representation. This is the prerequisite for
-every experiment downstream.
+18 MCP tools over JSON-RPC 2.0 / stdio. Claude connects, parses
+programs into claims, queries dependencies, renames functions,
+renders results — all through tool calls. Shipped `a12dce7`.
 
-**Tools:**
-- Core: reset, create_entity, create_named, create_value, claim
-- Query: query (Datalog), define_rule, inspect, claims_where, resolve_symbol
-- Schema: define_predicates, lookup, find_by, update
-- Lang: parse_program, render, rename
+## DONE: Materialized Views (Reactive Datalog)
 
-**Done when:** Claude can connect via MCP, parse a program into claims,
-query dependencies, rename a function, and render the result — all
-through tool calls.
+`materialize!` caches derived facts and registers hooks on `claim!`.
+New claims delta-propagate through rules incrementally. Views stay
+current without re-running the fixpoint.
 
-## NEXT: Materialized Views (Reactive Datalog)
+Results at N=200: dep query drops from 67ms (cold) to 0ms (cache hit).
+Incremental parse maintains views live — query after parse is O(1).
+Shipped `a12dce7`.
 
-Standing queries maintained incrementally when claims change.
-Today every `query` call reruns the full semi-naive fixpoint.
-With materialized views, `claim!` and supersession trigger delta
-updates on registered views. Agent queries become O(delta).
+## NOW: Provenance-Tracked Deletion
 
-**Key design questions:**
-- Which views to materialize (all rules? explicit registration?)
-- Invalidation granularity (per-rule? per-relation?)
-- Integration with supersession (view update on supersede)
+Supersession currently invalidates all materialized views, forcing
+a full fixpoint recompute on the next query. With provenance tracking:
 
-**Done when:** dependency query at N=200 drops from ~39ms to <1ms
-for incremental updates after a single claim change.
+- Each derived tuple records which claim IDs supported its derivation
+- On supersession, retract only tuples whose support set includes
+  the superseded claim
+- Re-derive what can still be derived through alternate paths
+- Result: supersession becomes O(delta), not O(full-fixpoint)
+
+**Done when:** rename at N=200 → next dep query is O(delta), not 38ms.
+
+## NEXT: Agent Coding Experiment (E1)
+
+The thesis: an agent codes faster with CNF than text as codebase
+grows. First experiment to prove it. See `docs/experiments/README.md`.
 
 ## LATER: Homoiconic Rules (Rules as Claims)
 
@@ -41,17 +44,5 @@ Datalog rules become claims in the graph. Rules are:
 The system describes itself. An agent can modify the query engine
 as part of its coding workflow.
 
-**Prerequisite:** materialized views (rule changes must trigger
-incremental recomputation, not full rebuild).
-
-## HORIZON: Agent Coding Experiment
-
-The thesis: an agent codes 5-10x faster with CNF than text as
-codebase grows. To prove it:
-
-1. Define a benchmark suite of coding tasks at scale (N=100, 500, 1000 functions)
-2. Measure wall-time for rename, dependency query, structural edit, add function
-3. Compare: agent + CNF/MCP vs agent + text files + grep/sed
-4. Show crossover point where CNF wins
-
-**Requires:** MCP server + materialized views + a real workload generator.
+**Prerequisite:** provenance-tracked deletion (rule changes must
+trigger incremental recomputation, not full rebuild).
