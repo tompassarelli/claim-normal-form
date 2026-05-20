@@ -240,5 +240,123 @@
   (check-equal? (hash-ref (first results) 'col) "blue")
   (displayln "PASS 12 — EDB-only rule fires without IDB iteration"))
 
+;; 13. Homoiconic rules — define-rule!/claims creates entity with proper claims
+(reset-store!)
+(reset-rules!)
+(setup-rule-predicates!)
+
+(let ()
+  (define ep (named! "edge"))
+  (define a (named! "a"))
+  (define b (named! "b"))
+  (void (claim! a ep b))
+
+  (define rule-ent
+    (define-rule!/claims
+      (atom 'connected (list (var 'x) (var 'y)))
+      (list (atom 'triple (list (var 'x) ep (var 'y))))))
+
+  (check-true (object-exists? rule-ent))
+  (check-not-false (member rule-ent (list-rule-entities)))
+
+  (define head-claims (current-claims-where #:l rule-ent #:p (rule-head-rel-pred)))
+  (check-equal? (length head-claims) 1)
+  (check-equal? (resolve-value (list-ref (first head-claims) 3)) "connected")
+
+  (define src-claims (current-claims-where #:l rule-ent #:p (rule-source-pred)))
+  (check-equal? (length src-claims) 1)
+
+  (define results (query (connected (? x) (? y))))
+  (check-equal? (length results) 1)
+  (check-equal? (hash-ref (first results) 'x) a)
+  (check-equal? (hash-ref (first results) 'y) b)
+  (displayln "PASS 13 — homoiconic rule: define, query, inspect as claims"))
+
+;; 14. Homoiconic rules — supersede-rule! replaces rule and updates derived facts
+(reset-store!)
+(reset-rules!)
+(setup-rule-predicates!)
+(define sup-pred (named! "supersedes"))
+(set-supersedes-pred! sup-pred)
+
+(let ()
+  (define ep (named! "edge"))
+  (define a (named! "a"))
+  (define b (named! "b"))
+  (define c (named! "c"))
+  (void (claim! a ep b))
+  (void (claim! b ep c))
+
+  (define old-rule-ent
+    (define-rule!/claims
+      (atom 'linked (list (var 'x) (var 'y)))
+      (list (atom 'triple (list (var 'x) ep (var 'y))))))
+
+  (define r1 (query (linked (? x) (? y))))
+  (check-equal? (length r1) 2)
+
+  (define new-rule-ent
+    (supersede-rule! old-rule-ent
+      (atom 'linked (list (var 'x) (var 'z)))
+      (list (atom 'triple (list (var 'x) ep (var 'y)))
+            (atom 'triple (list (var 'y) ep (var 'z))))))
+
+  (check-false (member old-rule-ent (list-rule-entities)))
+  (check-not-false (member new-rule-ent (list-rule-entities)))
+
+  (define old-head-claims (claims-where #:l old-rule-ent #:p (rule-head-rel-pred)))
+  (check-true
+    (andmap (lambda (c) (superseded? (first c))) old-head-claims))
+
+  (define r2 (query (linked (? x) (? z))))
+  (check-equal? (length r2) 1)
+  (check-equal? (hash-ref (first r2) 'x) a)
+  (check-equal? (hash-ref (first r2) 'z) c)
+  (displayln "PASS 14 — homoiconic rule: supersede updates derived facts"))
+
+;; 15. Incremental rule addition — define rule without full fixpoint recompute
+(reset-store!)
+(reset-rules!)
+(setup-rule-predicates!)
+
+(let ()
+  (define ep (named! "edge"))
+  (define a (named! "a"))
+  (define b (named! "b"))
+  (define c (named! "c"))
+  (void (claim! a ep b))
+  (void (claim! b ep c))
+
+  ;; Materialize base rules
+  (define-rule (direct (? x) (? y))
+    (triple (? x) ep (? y)))
+  (materialize!)
+
+  ;; Verify base rule works
+  (define r0 (query (direct (? x) (? y))))
+  (check-equal? (length r0) 2)
+
+  ;; Add a new rule incrementally (matview should stay valid)
+  (define rule-ent
+    (define-rule!/claims
+      (atom 'two-hop (list (var 'x) (var 'z)))
+      (list (atom 'direct (list (var 'x) (var 'y)))
+            (atom 'direct (list (var 'y) (var 'z))))))
+
+  ;; Matview should still be valid (incremental, not invalidated)
+  (check-true (ctx-ref 'matview-valid? #f))
+
+  ;; Query the new rule — should work without full recompute
+  (define r1 (query (two-hop (? x) (? z))))
+  (check-equal? (length r1) 1)
+  (check-equal? (hash-ref (first r1) 'x) a)
+  (check-equal? (hash-ref (first r1) 'z) c)
+
+  ;; Base rule still works
+  (define r2 (query (direct (? x) (? y))))
+  (check-equal? (length r2) 2)
+
+  (displayln "PASS 15 — incremental rule addition without full recompute"))
+
 (displayln "")
 (displayln "All Datalog tests passed.")

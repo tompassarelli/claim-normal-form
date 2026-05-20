@@ -13,7 +13,13 @@
          set-supersedes-pred!
          current-claims-where
          materialize!
-         invalidate-views!)
+         invalidate-views!
+         setup-rule-predicates!
+         define-rule!/claims
+         supersede-rule!
+         list-rule-entities
+         rule-head-rel-pred
+         rule-source-pred)
 
 ;; Datalog over CNF — semi-naive evaluation with index-aware joins.
 ;;
@@ -51,7 +57,9 @@
 
 (define (reset-rules!)
   (ctx-set! 'rules '())
-  (ctx-set! 'matview-valid? #f))
+  (ctx-set! 'matview-valid? #f)
+  (define ents (ctx-ref 'rule-entities #f))
+  (when (hash? ents) (hash-clear! ents)))
 
 ;; --- Syntax ---
 
@@ -358,6 +366,174 @@
        (set! delta-db new-delta)
        (loop)])))
 
+;; --- Provenance-aware evaluation ---
+;;
+;; Returns (listof (cons subst claim-id-set)) instead of (listof subst).
+;; Only tracks claim IDs accessed via current-triple / current-claim,
+;; since those are the relations affected by supersession.
+
+(define (idb-tuples/set db rel)
+  (set->list (hash-ref db rel (set))))
+
+(define (idb-tuples/list db rel)
+  (hash-ref db rel '()))
+
+(define (eval-claim-base/prov args resolved subst use-current?)
+  (define cid-val (and (bound? (list-ref resolved 0)) (list-ref resolved 0)))
+  (cond
+    [cid-val
+     (define fields (get-claim cid-val))
+     (if (and fields (or (not use-current?) (not (superseded? cid-val))))
+         (let ([t (list cid-val (first fields) (second fields) (third fields))])
+           (define s (match-tuple args t subst))
+           (if s (list (cons s (if use-current? (set cid-val) (set)))) '()))
+         '())]
+    [else
+     (define l (and (bound? (list-ref resolved 1)) (list-ref resolved 1)))
+     (define p (and (bound? (list-ref resolved 2)) (list-ref resolved 2)))
+     (define r (and (bound? (list-ref resolved 3)) (list-ref resolved 3)))
+     (define rows
+       (if use-current?
+           (current-claims-where #:l l #:p p #:r r)
+           (claims-where #:l l #:p p #:r r)))
+     (filter-map
+      (lambda (c)
+        (define s (match-tuple args (row->claim-tuple c) subst))
+        (and s (cons s (if use-current? (set (list-ref c 0)) (set)))))
+      rows)]))
+
+(define (match-atom-edb/prov a subst)
+  (define args (atom-args a))
+  (define resolved (map (lambda (x) (resolve-arg x subst)) args))
+  (case (atom-rel a)
+    [(current-triple)
+     (let* ([l (and (bound? (list-ref resolved 0)) (list-ref resolved 0))]
+            [p (and (bound? (list-ref resolved 1)) (list-ref resolved 1))]
+            [r (and (bound? (list-ref resolved 2)) (list-ref resolved 2))]
+            [rows (current-claims-where #:l l #:p p #:r r)])
+       (filter-map
+        (lambda (c)
+          (define s (match-tuple args (row->triple c) subst))
+          (and s (cons s (set (list-ref c 0)))))
+        rows))]
+    [(triple)
+     (let* ([l (and (bound? (list-ref resolved 0)) (list-ref resolved 0))]
+            [p (and (bound? (list-ref resolved 1)) (list-ref resolved 1))]
+            [r (and (bound? (list-ref resolved 2)) (list-ref resolved 2))]
+            [rows (claims-where #:l l #:p p #:r r)])
+       (filter-map
+        (lambda (c)
+          (define s (match-tuple args (row->triple c) subst))
+          (and s (cons s (set))))
+        rows))]
+    [(current-claim) (eval-claim-base/prov args resolved subst #t)]
+    [(claim)         (eval-claim-base/prov args resolved subst #f)]
+    [(value)  (map (lambda (s) (cons s (set))) (eval-value-base args resolved subst))]
+    [(object) (map (lambda (s) (cons s (set))) (eval-object-base args resolved subst))]))
+
+(define (eval-body/prov db prov-map atoms subst claims get-idb)
+  (cond
+    [(null? atoms) (list (cons subst claims))]
+    [else
+     (define a (car atoms))
+     (define matches
+       (if (edb-rel? (atom-rel a))
+           (match-atom-edb/prov a subst)
+           (filter-map
+            (lambda (t)
+              (define s (match-tuple (atom-args a) t subst))
+              (and s (cons s (hash-ref prov-map (cons (atom-rel a) t) (set)))))
+            (get-idb db (atom-rel a)))))
+     (for*/list ([m (in-list matches)]
+                 [result (in-list (eval-body/prov db prov-map (cdr atoms)
+                                   (car m) (set-union claims (cdr m)) get-idb))])
+       result)]))
+
+(define (eval-body-semi/prov db prov-map delta-db atoms delta-pos
+                             subst claims get-idb)
+  (define (go atoms idx subst claims)
+    (cond
+      [(null? atoms) (list (cons subst claims))]
+      [else
+       (define a (car atoms))
+       (define rel (atom-rel a))
+       (define matches
+         (cond
+           [(edb-rel? rel) (match-atom-edb/prov a subst)]
+           [(= idx delta-pos)
+            (filter-map
+             (lambda (t)
+               (define s (match-tuple (atom-args a) t subst))
+               (and s (cons s (hash-ref prov-map (cons rel t) (set)))))
+             (get-idb delta-db rel))]
+           [else
+            (filter-map
+             (lambda (t)
+               (define s (match-tuple (atom-args a) t subst))
+               (and s (cons s (hash-ref prov-map (cons rel t) (set)))))
+             (get-idb db rel))]))
+       (for*/list ([m (in-list matches)]
+                   [result (in-list (go (cdr atoms) (add1 idx) (car m)
+                                       (set-union claims (cdr m))))])
+         result)]))
+  (go atoms 0 subst claims))
+
+;; --- Provenance-aware fixpoint ---
+
+(define (record-prov! prov-map claim-rev rel tuple claims)
+  (define key (cons rel tuple))
+  (define existing (hash-ref prov-map key (set)))
+  (define merged (set-union existing claims))
+  (hash-set! prov-map key merged)
+  (for ([c (in-set (set-subtract merged existing))])
+    (hash-update! claim-rev c (lambda (s) (set-add s key)) (set))))
+
+(define (fixpoint-semi-naive/prov rules)
+  (define-values (edb-only-rules idb-rules) (classify-rules rules))
+  (define full-db (make-hash))
+  (define delta-db (make-hash))
+  (define prov-map (make-hash))
+  (define claim-rev (make-hash))
+
+  (for* ([r (in-list rules)]
+         [sp (in-list (eval-body/prov full-db prov-map
+                        (dl-rule-body r) (hasheq) (set) idb-tuples/set))])
+    (define subst (car sp))
+    (define claims (cdr sp))
+    (define d (instantiate-head r subst))
+    (when (db-add! full-db (car d) (cdr d))
+      (db-add! delta-db (car d) (cdr d)))
+    (record-prov! prov-map claim-rev (car d) (cdr d) claims))
+
+  (let loop ()
+    (define new-delta (make-hash))
+    (for* ([r (in-list idb-rules)])
+      (define body (dl-rule-body r))
+      (define positions (idb-body-positions body))
+      (for* ([delta-pos (in-list positions)]
+             [sp (in-list (eval-body-semi/prov full-db prov-map delta-db
+                            body delta-pos (hasheq) (set) idb-tuples/set))])
+        (define subst (car sp))
+        (define claims (cdr sp))
+        (define d (instantiate-head r subst))
+        (define existing (hash-ref full-db (car d) (set)))
+        (unless (set-member? existing (cdr d))
+          (db-add! new-delta (car d) (cdr d)))
+        (record-prov! prov-map claim-rev (car d) (cdr d) claims)))
+
+    (cond
+      [(db-empty? new-delta)
+       (define result (make-hash))
+       (for ([(rel tuples) (in-hash full-db)])
+         (hash-set! result rel (set->list tuples)))
+       (values result prov-map claim-rev)]
+      [else
+       (for* ([(rel tuples) (in-hash new-delta)]
+              [t (in-set tuples)])
+         (db-add! full-db rel t))
+       (set! delta-db new-delta)
+       (loop)])))
+
 ;; --- Query ---
 
 (define (resolve-if-edb a)
@@ -379,8 +555,11 @@
        cached-db]
       [(ctx-ref 'matview-hooks-registered? #f)
        (define resolved-rules (resolve-current-rules))
-       (define fresh-db (fixpoint-semi-naive resolved-rules))
+       (define-values (fresh-db prov-map claim-rev)
+         (fixpoint-semi-naive/prov resolved-rules))
        (ctx-set! 'matview-db fresh-db)
+       (ctx-set! 'matview-prov prov-map)
+       (ctx-set! 'matview-claim-rev claim-rev)
        (ctx-set! 'matview-resolved-rules resolved-rules)
        (ctx-set! 'matview-valid? #t)
        fresh-db]
@@ -388,46 +567,47 @@
        (fixpoint-semi-naive (resolve-current-rules))]))
   (eval-body db resolved-query (hasheq)))
 
-;; --- Materialized views ---
+;; --- Materialized views (with provenance) ---
 ;;
-;; materialize! runs the initial fixpoint, caches results, and registers
-;; hooks on claim! so the cache is maintained incrementally on insertion
-;; and invalidated on supersession.
-;;
-;; Insertion: each new claim produces new EDB tuples. We delta-propagate
-;; through rules (EDB→IDB, then IDB→IDB) to update derived facts
-;; without re-running the full fixpoint.
-;;
-;; Supersession: invalidates the cache. Next query recomputes and re-caches.
+;; materialize! runs the initial fixpoint with provenance tracking, caches
+;; results, and registers hooks on claim!:
+;;   - Insertion: delta-propagate with provenance tracking
+;;   - Supersession: retract only tuples whose provenance includes the
+;;     superseded claim, then re-derive through alternate paths
 
 (define (materialize!)
   (define resolved-rules (resolve-current-rules))
-  (define db (fixpoint-semi-naive resolved-rules))
+  (define-values (db prov-map claim-rev)
+    (fixpoint-semi-naive/prov resolved-rules))
   (ctx-set! 'matview-db db)
+  (ctx-set! 'matview-prov prov-map)
+  (ctx-set! 'matview-claim-rev claim-rev)
   (ctx-set! 'matview-resolved-rules resolved-rules)
   (ctx-set! 'matview-valid? #t)
   (unless (ctx-ref 'matview-hooks-registered? #f)
     (ctx-set! 'on-claim-hooks
-      (cons on-new-claim-hook! (ctx-ref 'on-claim-hooks '())))
+      (cons on-new-claim-prov! (ctx-ref 'on-claim-hooks '())))
     (ctx-set! 'on-supersede-hooks
-      (cons (lambda (_) (ctx-set! 'matview-valid? #f))
-            (ctx-ref 'on-supersede-hooks '())))
+      (cons on-supersede-prov! (ctx-ref 'on-supersede-hooks '())))
     (ctx-set! 'matview-hooks-registered? #t)))
 
 (define (invalidate-views!)
   (ctx-set! 'matview-valid? #f))
 
-(define (on-new-claim-hook! cid l p r)
+(define (on-new-claim-prov! cid l p r)
   (define db (ctx-ref 'matview-db #f))
   (when (and db (ctx-ref 'matview-valid? #f))
     (define rules (ctx-ref 'matview-resolved-rules '()))
-    (propagate-edb-delta! db rules
+    (define prov-map (ctx-ref 'matview-prov))
+    (define claim-rev (ctx-ref 'matview-claim-rev))
+    (propagate-edb-delta/prov! db prov-map claim-rev rules
       (list (list 'triple l p r)
             (list 'claim cid l p r)
             (list 'current-triple l p r)
-            (list 'current-claim cid l p r)))))
+            (list 'current-claim cid l p r))
+      cid)))
 
-(define (propagate-edb-delta! db rules new-edb-entries)
+(define (propagate-edb-delta/prov! db prov-map claim-rev rules entries source-cid)
   (define new-idb (make-hash))
 
   (for ([r (in-list rules)])
@@ -435,27 +615,35 @@
     (for ([i (in-range (length body))])
       (define a (list-ref body i))
       (when (edb-rel? (atom-rel a))
-        (for ([entry (in-list new-edb-entries)]
+        (for ([entry (in-list entries)]
               #:when (eq? (car entry) (atom-rel a)))
           (define tuple (cdr entry))
           (define subst (match-tuple (atom-args a) tuple (hasheq)))
           (when subst
+            (define entry-claims
+              (if (memq (car entry) '(current-triple current-claim))
+                  (set source-cid)
+                  (set)))
             (define other-body (append (take body i) (drop body (add1 i))))
-            (for ([s (in-list (eval-body-full db other-body subst))])
+            (for ([sp (in-list (eval-body/prov db prov-map other-body
+                                 subst entry-claims idb-tuples/list))])
+              (define s (car sp))
+              (define claims (cdr sp))
               (define d (instantiate-head r s))
               (define rel (car d))
               (define tup (cdr d))
               (unless (member tup (hash-ref db rel '()))
                 (unless (member tup (hash-ref new-idb rel '()))
                   (hash-update! new-idb rel
-                    (lambda (old) (cons tup old)) '())))))))))
+                    (lambda (old) (cons tup old)) '()))
+                (record-prov! prov-map claim-rev rel tup claims))))))))
 
   (unless (hash-empty? new-idb)
     (for ([(rel tuples) (in-hash new-idb)])
       (hash-set! db rel (append tuples (hash-ref db rel '()))))
-    (propagate-idb-delta! db rules new-idb)))
+    (propagate-idb-delta/prov! db prov-map claim-rev rules new-idb)))
 
-(define (propagate-idb-delta! db rules delta-idb)
+(define (propagate-idb-delta/prov! db prov-map claim-rev rules delta-idb)
   (define new-idb (make-hash))
 
   (for ([r (in-list rules)])
@@ -468,20 +656,170 @@
         (for ([dt (in-list delta-tuples)])
           (define subst (match-tuple (atom-args a) dt (hasheq)))
           (when subst
+            (define dt-claims
+              (hash-ref prov-map (cons (atom-rel a) dt) (set)))
             (define other-body (append (take body pos) (drop body (add1 pos))))
-            (for ([s (in-list (eval-body-full db other-body subst))])
+            (for ([sp (in-list (eval-body/prov db prov-map other-body
+                                 subst dt-claims idb-tuples/list))])
+              (define s (car sp))
+              (define claims (cdr sp))
               (define d (instantiate-head r s))
               (define rel (car d))
               (define tup (cdr d))
               (unless (member tup (hash-ref db rel '()))
                 (unless (member tup (hash-ref new-idb rel '()))
                   (hash-update! new-idb rel
-                    (lambda (old) (cons tup old)) '())))))))))
+                    (lambda (old) (cons tup old)) '()))
+                (record-prov! prov-map claim-rev rel tup claims))))))))
 
   (unless (hash-empty? new-idb)
     (for ([(rel tuples) (in-hash new-idb)])
       (hash-set! db rel (append tuples (hash-ref db rel '()))))
-    (propagate-idb-delta! db rules new-idb)))
+    (propagate-idb-delta/prov! db prov-map claim-rev rules new-idb)))
+
+(define (on-supersede-prov! superseded-cid)
+  (define db (ctx-ref 'matview-db #f))
+  (define prov-map (ctx-ref 'matview-prov #f))
+  (define claim-rev (ctx-ref 'matview-claim-rev #f))
+  (when (and db prov-map claim-rev (ctx-ref 'matview-valid? #f))
+    (define affected (hash-ref claim-rev superseded-cid (set)))
+    (unless (set-empty? affected)
+      (define retracted-keys (set->list affected))
+      (for ([key (in-list retracted-keys)])
+        (define rel (car key))
+        (define tuple (cdr key))
+        (hash-set! db rel (remove tuple (hash-ref db rel '())))
+        (define old-claims (hash-ref prov-map key (set)))
+        (hash-remove! prov-map key)
+        (for ([c (in-set old-claims)])
+          (hash-update! claim-rev c
+            (lambda (s) (set-remove s key)) (set))))
+      (define rules (ctx-ref 'matview-resolved-rules '()))
+      (let rederive-loop ()
+        (define progress? #f)
+        (for ([key (in-list retracted-keys)])
+          (define rel (car key))
+          (define tuple (cdr key))
+          (unless (member tuple (hash-ref db rel '()))
+            (for ([r (in-list rules)]
+                  #:when (eq? (atom-rel (dl-rule-head r)) rel)
+                  #:unless (member tuple (hash-ref db rel '())))
+              (define head-subst
+                (match-tuple (atom-args (dl-rule-head r)) tuple (hasheq)))
+              (when head-subst
+                (define results
+                  (eval-body/prov db prov-map (dl-rule-body r)
+                    head-subst (set) idb-tuples/list))
+                (when (not (null? results))
+                  (define new-claims (cdr (first results)))
+                  (hash-update! db rel
+                    (lambda (old) (cons tuple old)) '())
+                  (record-prov! prov-map claim-rev rel tuple new-claims)
+                  (set! progress? #t))))))
+        (when progress? (rederive-loop))))))
+
+;; --- Incremental rule addition ---
+;;
+;; When the matview is valid and a new rule is added, evaluate just that
+;; rule against the existing DB. Any new facts delta-propagate through
+;; ALL rules (including the new one). Avoids full fixpoint recompute.
+
+(define (propagate-new-rule/prov! new-rule)
+  (define db (ctx-ref 'matview-db))
+  (define prov-map (ctx-ref 'matview-prov))
+  (define claim-rev (ctx-ref 'matview-claim-rev))
+
+  (define resolved
+    (dl-rule (dl-rule-head new-rule)
+             (map resolve-if-edb (dl-rule-body new-rule))))
+
+  (define all-rules (cons resolved (ctx-ref 'matview-resolved-rules '())))
+  (ctx-set! 'matview-resolved-rules all-rules)
+
+  (define delta (make-hash))
+  (for ([sp (in-list (eval-body/prov db prov-map
+                       (dl-rule-body resolved) (hasheq) (set) idb-tuples/list))])
+    (define subst (car sp))
+    (define claims (cdr sp))
+    (define d (instantiate-head resolved subst))
+    (define rel (car d))
+    (define tup (cdr d))
+    (unless (member tup (hash-ref db rel '()))
+      (unless (member tup (hash-ref delta rel '()))
+        (hash-update! delta rel (lambda (old) (cons tup old)) '()))
+      (record-prov! prov-map claim-rev rel tup claims)))
+
+  (unless (hash-empty? delta)
+    (for ([(rel tuples) (in-hash delta)])
+      (hash-set! db rel (append tuples (hash-ref db rel '()))))
+    (propagate-idb-delta/prov! db prov-map claim-rev all-rules delta)))
+
+;; --- Homoiconic rules (rules as claims) ---
+;;
+;; Rules become entities in the claim graph with two properties:
+;;   rule-head-rel  → relation name (string value)
+;;   rule-source    → serialized s-expression (string value)
+;;
+;; Legacy define-rule macro still works for built-in rules (eval, graph, lang).
+;; define-rule!/claims creates a rule entity, stores it as claims, AND pushes
+;; it to the in-memory rules list so the engine can use it.
+
+(define (rule-head-rel-pred)
+  (ctx-ref 'rule-head-rel-pred-id))
+
+(define (rule-source-pred)
+  (ctx-ref 'rule-source-pred-id))
+
+(define (setup-rule-predicates!)
+  (ctx-set! 'rule-head-rel-pred-id (named! "rule-head-rel"))
+  (ctx-set! 'rule-source-pred-id (named! "rule-source"))
+  (ctx-set! 'rule-entities (make-hash)))
+
+(define (serialize-atom a)
+  (define args-strs
+    (for/list ([arg (atom-args a)])
+      (cond
+        [(var? arg) (format "(? ~a)" (var-name arg))]
+        [(string? arg) (format "~s" arg)]
+        [else (format "~a" arg)])))
+  (format "(~a~a)"
+    (atom-rel a)
+    (if (null? args-strs) ""
+        (string-append " " (string-join args-strs " ")))))
+
+(define (serialize-rule head body)
+  (format "~a :- ~a"
+    (serialize-atom head)
+    (string-join (map serialize-atom body) " ")))
+
+(define (define-rule!/claims head-atom body-atoms)
+  (define rule (dl-rule head-atom body-atoms))
+  (define rule-ent (entity!))
+  (claim! rule-ent (rule-head-rel-pred) (value! (symbol->string (atom-rel head-atom))))
+  (claim! rule-ent (rule-source-pred) (value! (serialize-rule head-atom body-atoms)))
+  (ctx-set! 'rules (cons rule (ctx-ref 'rules '())))
+  (hash-set! (ctx-ref 'rule-entities) rule-ent rule)
+  (if (and (ctx-ref 'matview-db #f) (ctx-ref 'matview-valid? #f))
+      (propagate-new-rule/prov! rule)
+      (invalidate-views!))
+  rule-ent)
+
+(define (supersede-rule! old-rule-ent new-head-atom new-body-atoms)
+  (define rule-ents (ctx-ref 'rule-entities))
+  (define old-rule (hash-ref rule-ents old-rule-ent #f))
+  (unless old-rule
+    (error 'supersede-rule! "unknown rule entity: ~a" old-rule-ent))
+  (ctx-set! 'rules (remq old-rule (ctx-ref 'rules '())))
+  (hash-remove! rule-ents old-rule-ent)
+  (define sup-pred (supersedes-pred-id))
+  (for ([c (in-list (current-claims-where #:l old-rule-ent))])
+    (claim! (entity!) sup-pred (first c)))
+  (invalidate-views!)
+  (define-rule!/claims new-head-atom new-body-atoms))
+
+(define (list-rule-entities)
+  (define ents (ctx-ref 'rule-entities #f))
+  (if (hash? ents) (hash-keys ents) '()))
 
 (define (show-results results)
   (if (null? results)

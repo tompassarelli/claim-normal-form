@@ -8,3 +8,7 @@ Each entry is a snapshot of understanding at the time it was written.
 | # | Date | Title |
 |---|------|-------|
 | 001 | 2025-05-20 | [Materialized views: query-time computation disappears](001-materialized-views.md) |
+| 002 | 2026-05-20 | [E1 benchmark + provenance-tracked deletion](002-e1-benchmark-honest-numbers.md) |
+| 003 | 2026-05-20 | [Homoiconic rules: rules as claims](003-homoiconic-rules.md) |
+| 004 | 2026-05-20 | [E3 agent comparison: honest numbers](004-agent-comparison.md) |
+| 005 | 2026-05-20 | [Incremental rule addition](005-incremental-rule-addition.md) |

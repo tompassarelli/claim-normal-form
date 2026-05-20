@@ -37,6 +37,7 @@
   (setup-eval!)
   (setup-graph!)
   (setup-schema!)
+  (setup-rule-predicates!)
   (setup-lang!)
   (materialize!))
 
@@ -195,6 +196,22 @@
       'required '("head" "body")))
 
    (hasheq
+    'name "list_rules"
+    'description "List all rules defined as claims. Shows rule entity ID, head relation, and source."
+    'inputSchema (hasheq 'type "object" 'properties (hasheq)))
+
+   (hasheq
+    'name "supersede_rule"
+    'description "Replace a rule with a new definition. Old rule is superseded, derived facts recompute on next query."
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'old_rule_id (hasheq 'type "string" 'description "Entity ID of the rule to replace")
+        'head (hasheq 'type "string" 'description "New rule head atom (S-expression)")
+        'body (hasheq 'type "string" 'description "New rule body atoms (S-expressions)"))
+      'required '("old_rule_id" "head" "body")))
+
+   (hasheq
     'name "inspect"
     'description "Get full information about an object: type, value/claim data, name, claims about it, claims targeting it."
     'inputSchema (hasheq
@@ -341,10 +358,37 @@
      (define body-str (hash-ref arguments 'body))
      (define head-atom (parse-atom-sexpr (read (open-input-string head-str))))
      (define body-atoms (parse-clauses body-str))
-     (ctx-set! 'rules
-       (cons (dl-rule head-atom body-atoms)
-             (ctx-ref 'rules '())))
-     (format "Rule defined: ~a :- ~a" head-str body-str)]
+     (define rule-ent (define-rule!/claims head-atom body-atoms))
+     (format "Rule ~a defined: ~a :- ~a" rule-ent head-str body-str)]
+
+    [("list_rules")
+     (define rule-ents (list-rule-entities))
+     (if (null? rule-ents)
+         "No rules defined as claims."
+         (string-join
+          (cons (format "~a rule(s):" (length rule-ents))
+                (for/list ([ent (in-list rule-ents)])
+                  (define head-claims
+                    (current-claims-where #:l ent #:p (rule-head-rel-pred)))
+                  (define head-rel
+                    (if (null? head-claims) "?"
+                        (resolve-value (list-ref (first head-claims) 3))))
+                  (define src-claims
+                    (current-claims-where #:l ent #:p (rule-source-pred)))
+                  (define src
+                    (if (null? src-claims) "?"
+                        (resolve-value (list-ref (first src-claims) 3))))
+                  (format "  ~a: ~a — ~a" ent head-rel src)))
+          "\n"))]
+
+    [("supersede_rule")
+     (define old-id (hash-ref arguments 'old_rule_id))
+     (define head-str (hash-ref arguments 'head))
+     (define body-str (hash-ref arguments 'body))
+     (define head-atom (parse-atom-sexpr (read (open-input-string head-str))))
+     (define body-atoms (parse-clauses body-str))
+     (define new-ent (supersede-rule! old-id head-atom body-atoms))
+     (format "Rule ~a superseded by ~a: ~a :- ~a" old-id new-ent head-str body-str)]
 
     [("inspect")
      (define id (hash-ref arguments 'id))
@@ -480,7 +524,8 @@
      (define objs (length (all-objects)))
      (define cls (length (claims-where)))
      (define rules (length (ctx-ref 'rules '())))
-     (format "Objects: ~a\nClaims: ~a\nRules: ~a" objs cls rules)]
+     (define rule-ents (length (list-rule-entities)))
+     (format "Objects: ~a\nClaims: ~a\nRules: ~a (~a as claims)" objs cls rules rule-ents)]
 
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))
