@@ -396,6 +396,20 @@ functions. Parse (55ms) → 542 objects, 338 claims → 7 direct deps,
 15 transitive pairs → rename (0.03ms) → incremental edit (add + modify
 + rename). Run `racket python-demo.rkt` to reproduce.
 
+## DONE: E15 — Correctness Evaluation (CNF vs Grep)
+
+50-function Python codebase, 5 structural tasks with ground truth.
+CNF correct on all 5. Grep wrong on all 5:
+
+1. Transitive impact: CNF finds 17, grep finds 9 (misses 47%)
+2. Rename safety: CNF 6 exact sites, grep has false positives from strings
+3. Shadowed names: CNF resolves per-entity, grep conflates 5 name pairs
+4. Dead code: CNF definitive (7 uncalled), grep unreliable
+5. Full dep tree: CNF finds 21, grep finds 7 (misses 67%)
+
+This is the experiment the reviewer asked for: not speed, correctness.
+Results: `docs/experiments/e15-correctness/`.
+
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
 Current MVCC gives snapshot isolation for reads with serialized writes.

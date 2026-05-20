@@ -21,6 +21,7 @@ a maintained semantic index than against text files.
 | E12 | Real demo | [results](e12-real-demo/results.md) | 100 fns, full workflow: parse→rules→refactor→evolve. Incremental parse works. |
 | E13 | Beagle bridge | [results](e13-beagle-bridge/results.md) | Real language (30+ form types). Parse→deps→rename→edit works end-to-end. |
 | E14 | Python bridge | [results](e14-python-bridge/results.md) | Second language. Subprocess parse, same engine. Language-agnostic MCP. |
+| E15 | Correctness eval | [results](e15-correctness/results.md) | **CNF correct on 5/5 tasks. Grep wrong on 5/5.** The payoff experiment. |
 
 ## The arc
 
