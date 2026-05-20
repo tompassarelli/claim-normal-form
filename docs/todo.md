@@ -526,6 +526,23 @@ speed cost exceeds the correctness benefit.
 See `docs/experiments/f6-time-to-correct/results.md` and
 `docs/devlog/025-f6-time-to-correct.md`.
 
+## NOW: F7 — Graph Necessity
+
+Bridge validation spike complete. 18-module Python codebase (4947 LOC)
+parsed through CNF Python bridge. Graph produces 36-function impact zone
+for status changes, exactly matching ground truth for all key constants.
+Five bridge improvements shipped (name-ref entities, comprehension filters,
+top-level variables, call target trees, py-fn-references rule).
+
+Next steps:
+1. Build integration test oracle (mutation-style per-site tests for
+   archived + on_hold feature)
+2. Run three conditions: grep agent, file-reading agent, graph-first agent
+3. Measure first-pass edit-site recall, tokens consumed, repair rounds
+
+See `docs/experiments/f7-graph-necessity/results.md` and
+`docs/devlog/026-f7-bridge-spike.md`.
+
 ## LATER: BEAM Runtime
 
 CNF is the data model. Datalog is the reasoning layer. BEAM is the

@@ -31,6 +31,7 @@ a maintained semantic index than against text files.
 | F4 | Overlapping edits | [results](f4-overlap/results.md) | **Shared file modification + mid-run requirement. Git 18/21 (3 temporal failures, merge conflicts). CNF 21/21. Three failure modes: merge conflicts, hidden dependencies, temporal divergence.** |
 | F5 | Coordination curve | [results](f5-curve/results.md) | **8 agents, 28 tests, 3 tiers. Git 25/28 (3 temporal divergence). CNF 28/28. All git failures: on_hold mid-run requirement invisible to forked agents.** |
 | F6 | Time to correct | [results](f6-time-to-correct/results.md) | **Real agents, wall clock to 28/28. Git 276s (parallel + 1 repair round). CNF 500s (sequential, 0 repairs). Git 1.8x faster. Parallelism beats correctness at this scale.** |
+| F7 | Graph necessity | [results](f7-graph-necessity/results.md) | **Bridge spike: 18 modules, 4947 LOC. Graph finds 36-function impact zone. TERMINAL_STATUSES 8/8, ACTIVE_STATUSES 15/15 — exact match vs ground truth. Graph ignores imports/docstrings, computes call chains, Datalog transitive closure. Spike GREEN.** |
 
 ## The arc
 
@@ -184,3 +185,13 @@ repair loop was cheap — one agent, clear error messages, local
 fixes. Parallelism beats correctness when the repair is easy.
 The path forward is CNF parallelism (BEAM): concurrent agents
 writing to the shared graph, getting both speed and correctness.
+
+F7 shifts the question from coordination (F2–F6) to necessity:
+does the semantic graph itself provide value beyond reading files?
+The bridge validation spike parsed 18 modules (4947 LOC) through
+the Python bridge and ran structural queries. TERMINAL_STATUSES:
+8/8 exact match. ACTIVE_STATUSES: 15/15 exact match. Graph ignores
+imports and docstrings that grep over-reports, computes call chains
+and transitive closure via Datalog, and produces a 36-function
+impact zone across 12 modules in one query. Spike GREEN — the
+graph answers structural questions that grep cannot represent.

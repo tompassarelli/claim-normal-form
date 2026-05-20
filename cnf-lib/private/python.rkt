@@ -65,6 +65,12 @@
     (current-triple (? caller) bp (? body))
     (py-contains-call (? body) (? callee))
     (current-triple (? callee) fkp defn-val))
+  (define var-val (value! "variable"))
+  (define-rule (py-fn-references (? fn) (? var))
+    (current-triple (? fn) fkp defn-val)
+    (current-triple (? fn) bp (? body))
+    (py-contains-call (? body) (? var))
+    (current-triple (? var) fkp var-val))
   (void))
 
 (define (restore-python-lang!)
@@ -129,20 +135,54 @@
 (define (parse-python-program! source)
   (define ast-json (parse-python-source source))
   (define body (hash-ref ast-json 'body '()))
+  (define top-scope (make-hash))
   (for/list ([node (in-list body)]
-             #:when (member (hash-ref node 'type #f) '("function_def" "class_def")))
-    (parse-top-node! node)))
+             #:when (member (hash-ref node 'type #f)
+                            '("function_def" "class_def"
+                              "assign" "ann_assign" "import")))
+    (parse-top-node! node top-scope)))
 
 (define (parse-python-file! path)
   (parse-python-program! (file->string path)))
 
 ;; --- Top-level node dispatch ---
 
-(define (parse-top-node! node)
+(define (parse-top-node! node [scope (make-hash)])
   (define type (hash-ref node 'type))
   (cond
     [(equal? type "function_def") (parse-function-def! node)]
     [(equal? type "class_def") (parse-class-def! node)]
+    [(equal? type "assign")
+     (define e (entity!))
+     (claim! e (py-form-kind-pred) (value! "variable"))
+     (define targets (hash-ref node 'targets '()))
+     (when (and (pair? targets) (string? (first targets)))
+       (give-name! e (first targets)))
+     (define val (parse-expr-node! (hash-ref node 'value) scope))
+     (claim! e (py-body-pred) val)
+     e]
+    [(equal? type "ann_assign")
+     (define e (entity!))
+     (claim! e (py-form-kind-pred) (value! "variable"))
+     (define target (hash-ref node 'target #f))
+     (when (string? target)
+       (give-name! e target))
+     (when (hash-ref node 'annotation #f)
+       (claim! e (py-has-type-pred) (value! (hash-ref node 'annotation))))
+     (when (hash-ref node 'value #f)
+       (define val (parse-expr-node! (hash-ref node 'value) scope))
+       (claim! e (py-body-pred) val))
+     e]
+    [(equal? type "import")
+     (define e (entity!))
+     (claim! e (py-form-kind-pred) (value! "import"))
+     (define mod (hash-ref node 'module #f))
+     (when mod
+       (give-name! e mod))
+     (for ([name-info (in-list (hash-ref node 'names '()))])
+       (define n (hash-ref name-info 'name))
+       (claim! e (py-has-child-pred) (value! n)))
+     e]
     [else
      (define e (entity!))
      (claim! e (py-form-kind-pred) (value! type))
@@ -240,6 +280,9 @@
          [(resolve-py-name func-name) => values]
          [else (value! func-name)]))
      (claim! e (py-calls-pred) fn-ref)
+     (when (hash-ref node 'func_node #f)
+       (define fn-tree (parse-expr-node! (hash-ref node 'func_node) scope))
+       (claim! e (py-has-child-pred) fn-tree))
      (for ([arg (in-list (hash-ref node 'args '()))]
            [i (in-naturals)])
        (define child (parse-expr-node! arg scope))
@@ -255,7 +298,12 @@
      (define id (hash-ref node 'id "?"))
      (cond
        [(hash-ref scope id #f) => values]
-       [else (value! id)])]
+       [else
+        (define target (or (resolve-py-name id) (value! id)))
+        (define ref (entity!))
+        (claim! ref (py-expr-kind-pred) (value! "name-ref"))
+        (claim! ref (py-calls-pred) target)
+        ref])]
 
     [(equal? type "constant")
      (value! (hash-ref node 'value))]
@@ -442,7 +490,10 @@
        (claim! e (py-has-child-pred) v))
      (for ([gen (in-list (hash-ref node 'generators '()))])
        (define iter-expr (parse-expr-node! (hash-ref gen 'iter) scope))
-       (claim! e (py-has-child-pred) iter-expr))
+       (claim! e (py-has-child-pred) iter-expr)
+       (for ([if-node (in-list (hash-ref gen 'ifs '()))])
+         (define if-expr (parse-expr-node! if-node scope))
+         (claim! e (py-has-child-pred) if-expr)))
      e]
 
     [(member type '("list" "tuple" "set"))

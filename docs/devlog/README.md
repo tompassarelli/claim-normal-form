@@ -32,3 +32,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 023 | 2026-05-21 | [F4: Overlapping edits — the merge problem is structural](023-f4-overlap.md) |
 | 024 | 2026-05-21 | [F5: The coordination curve](024-f5-coordination-curve.md) |
 | 025 | 2026-05-21 | [F6: Git was faster](025-f6-time-to-correct.md) |
+| 026 | 2026-05-21 | [F7: Bridge validation spike](026-f7-bridge-spike.md) |
