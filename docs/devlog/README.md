@@ -33,3 +33,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 024 | 2026-05-21 | [F5: The coordination curve](024-f5-coordination-curve.md) |
 | 025 | 2026-05-21 | [F6: Git was faster](025-f6-time-to-correct.md) |
 | 026 | 2026-05-21 | [F7: Bridge validation spike](026-f7-bridge-spike.md) |
+| 027 | 2026-05-21 | [F7: The graph filters, it doesn't find](027-f7-agent-experiment.md) |

@@ -189,6 +189,11 @@ is untouched.
   276s (parallel + repair), CNF 500s (sequential, no repair).
   **Git 1.8x faster.** Parallelism beats correctness when
   repair is cheap. CNF needs its own parallelism.
+- **F7**: Graph necessity. 18 modules, 49 tests, 7 edit sites.
+  Three agents (grep, file-reader, graph-first) identify edit
+  sites. Same recall (86%), but graph precision 60% vs grep 35%
+  with 3.2x fewer tool calls. The graph doesn't help agents
+  *find* more sites — it helps them *skip* more non-sites.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -285,8 +290,8 @@ Claude Code MCP configuration (`.claude/settings.json`):
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 25 experiments (E1–E19, F2–F6) with raw results |
-| **[Devlog](docs/devlog/)** | 25 entries — discoveries, direction changes, honest numbers |
+| **[Experiments](docs/experiments/)** | 26 experiments (E1–E19, F2–F7) with raw results |
+| **[Devlog](docs/devlog/)** | 27 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests
@@ -310,6 +315,14 @@ sequential-but-correct. The repair agent fixed 6 failures in 56
 seconds — the failures had clear error messages and local fixes.
 CNF's correctness advantage is real but currently costs more time
 than it saves.
+
+F7 tested whether the semantic graph itself is necessary (vs. just
+reading files). For a cross-cutting feature on an 18-module codebase,
+the graph doesn't help agents find more edit sites — grep finds
+them all. The graph's value is precision (60% vs 35%) and efficiency
+(3.2x fewer tool calls): knowing which of the many hits actually
+need attention. At 18 modules the savings are modest; at scale the
+filtering advantage compounds.
 
 The path forward is CNF parallelism: concurrent agents writing to
 the shared graph simultaneously, getting both speed and correctness.

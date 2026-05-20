@@ -526,22 +526,20 @@ speed cost exceeds the correctness benefit.
 See `docs/experiments/f6-time-to-correct/results.md` and
 `docs/devlog/025-f6-time-to-correct.md`.
 
-## NOW: F7 — Graph Necessity
+## DONE: F7 — Graph Necessity
 
-Bridge validation spike complete. 18-module Python codebase (4947 LOC)
-parsed through CNF Python bridge. Graph produces 36-function impact zone
-for status changes, exactly matching ground truth for all key constants.
-Five bridge improvements shipped (name-ref entities, comprehension filters,
-top-level variables, call target trees, py-fn-references rule).
+18-module helpdesk app (4947 LOC), 49 integration tests from feature
+spec, 7 edit sites across 4 files. Three-condition agent experiment:
+grep-only, file-reading, graph-first.
 
-Next steps:
-1. Build integration test oracle (mutation-style per-site tests for
-   archived + on_hold feature)
-2. Run three conditions: grep agent, file-reading agent, graph-first agent
-3. Measure first-pass edit-site recall, tokens consumed, repair rounds
+Results: Same recall (6/7, 86%) across all conditions — the 7th site
+is a latent crash bug only discoverable by execution. Graph precision
+60% vs grep 35% (2.8x fewer false positives). Graph 11 tool calls vs
+grep 35 (3.2x fewer). The graph doesn't help agents FIND more sites —
+it helps them SKIP more non-sites and work more efficiently.
 
 See `docs/experiments/f7-graph-necessity/results.md` and
-`docs/devlog/026-f7-bridge-spike.md`.
+`docs/devlog/027-f7-agent-experiment.md`.
 
 ## LATER: BEAM Runtime
 
