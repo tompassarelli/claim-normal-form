@@ -1,0 +1,59 @@
+(defn distance [x y]
+  (+ (* x x) (* y y)))
+
+(defn normalize [x y]
+  (/ x (distance x y)))
+
+(defn dot [x y]
+  (+ (* x x) (* y y)))
+
+(defn scale [x factor]
+  (* x factor))
+
+(defn translate [x offset]
+  (+ x offset))
+
+(defn transform [x y]
+  (translate (scale (normalize x y) y) x))
+
+(defn reflect [x y]
+  (- x (scale y x)))
+
+(defn midpoint [x y]
+  (scale (+ x y) x))
+
+(defn lerp [a b]
+  (+ (scale a b) (scale b a)))
+
+(defn project [x y]
+  (scale (dot x y) (dot y y)))
+
+(defn reject [x y]
+  (- x (project x y)))
+
+(defn basis-x [x y]
+  (normalize x y))
+
+(defn basis-y [x y]
+  (normalize (reject x y) y))
+
+(defn decompose [x y]
+  (+ (project x y) (reject x y)))
+
+(defn recompose [x y]
+  (+ (scale (basis-x x y) x) (scale (basis-y x y) y)))
+
+(defn apply-transform [x y]
+  (transform (project x y) (reject x y)))
+
+(defn invert-transform [x y]
+  (transform (reject x y) (project x y)))
+
+(defn compose-transforms [x y]
+  (apply-transform (apply-transform x y) y))
+
+(defn chain [x y]
+  (compose-transforms (transform x y) (reflect x y)))
+
+(defn pipeline [x y]
+  (chain (chain x y) (chain y x)))

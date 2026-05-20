@@ -103,7 +103,40 @@ E4 Step 6: 256ms → 16ms (16x). E3 Phase 5 at N=200: 110ms → 3.5ms
 (31x). CNF now wins total wall time at N=100 (1.95x, was 0.53x).
 60 tests passing. See `docs/devlog/007-incremental-supersession.md`.
 
-## NOW: Real Codebase Demo
+## DONE: E5 Arena — First Real Agent Comparison
+
+Two real Claude agents, same task, same 20-function program. CNF agent
+(42 calls, 191s) vs Text agent (8 calls, 82s). Both correct. Text wins
+the single task. CNF builds persistent structural understanding.
+
+Key finding: **the bottleneck shifted from compute to protocol**. The
+engine is 100-1000x faster per-op, but the MCP interface forces 42
+round-trips where 5 would do. Schema discovery alone was ~15 calls.
+See `docs/experiments/e5-arena/` and `docs/devlog/008-interface-redesign.md`.
+
+## DONE: Interface Redesign (Schema + Symbols + Batch)
+
+Three changes targeting the real bottleneck (tool call count):
+1. `parse_program` returns full schema (predicate names → IDs)
+2. Bare symbols in queries resolve to named entities automatically
+3. `batch` tool: multiple operations in one call
+
+Predicted impact: 42 calls → ~5 for E5's task. 21 MCP tools (was 20).
+
+## DONE: E6 Multi-Round Arena
+
+Five sequential tasks, two real agents. Text wins total (12 vs 32
+calls), but CNF wins tasks 2-5 (5 vs 7). Compounding thesis validated.
+Schema discovery ate 13 of 27 task-1 calls. See `docs/experiments/e6-multi-round/`.
+
+## DONE: E7 Interface Proof
+
+Same E5 task with the new interface: **7 calls instead of 42** (6x
+reduction). Schema in parse eliminates discovery. Batch combines rule
+definitions + query into 1 call. Projected E6 total: ~11 (CNF) vs 12
+(text). **CNF wins total for the first time.** See `docs/experiments/e7-interface-proof/`.
+
+## NEXT: Real Codebase Demo
 
 Run the MCP server against a non-toy Racket project (50+ functions).
 Show the full workflow: parse, discover, define rules, refactor,

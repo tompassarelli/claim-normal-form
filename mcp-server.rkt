@@ -43,6 +43,9 @@
 
 ;; --- S-expression query parsing ---
 
+(define (resolve-name sym-str)
+  (or (resolve-symbol sym-str) sym-str))
+
 (define (parse-atom-sexpr sexpr)
   (define rel (car sexpr))
   (define args
@@ -53,7 +56,7 @@
         [(string? a) a]
         [(number? a) a]
         [(boolean? a) a]
-        [(symbol? a) (symbol->string a)]
+        [(symbol? a) (resolve-name (symbol->string a))]
         [else (error 'parse-atom "unexpected argument: ~v" a)])))
   (atom rel args))
 
@@ -171,9 +174,11 @@
     'description (string-append
       "Run a Datalog query over the claim graph. "
       "Body uses S-expression syntax with (? name) for variables. "
+      "Bare symbols resolve to named entities: (current-triple (? x) body (? b)) "
+      "resolves 'body' to its predicate ID automatically. "
       "Base relations: triple(L,P,R), claim(Id,L,P,R), current-triple(L,P,R), "
       "current-claim(Id,L,P,R), value(Id,Literal), object(Id). "
-      "Example: (current-triple (? x) \"42\" (? r))")
+      "Example: (current-triple (? fn) body (? expr))")
     'inputSchema (hasheq
       'type "object"
       'properties (hasheq
@@ -186,8 +191,9 @@
     'description (string-append
       "Define a Datalog rule (derived relation). "
       "Head and body use S-expression syntax. "
+      "Bare symbols resolve to named entities automatically. "
       "Example head: (reachable (? x) (? y)), "
-      "body: (triple (? x) \"edge-pred-id\" (? y))")
+      "body: (current-triple (? x) body (? expr))")
     'inputSchema (hasheq
       'type "object"
       'properties (hasheq
@@ -316,7 +322,29 @@
    (hasheq
     'name "status"
     'description "Workspace overview: object count, claim count, rule count."
-    'inputSchema (hasheq 'type "object" 'properties (hasheq)))))
+    'inputSchema (hasheq 'type "object" 'properties (hasheq)))
+
+   (hasheq
+    'name "batch"
+    'description (string-append
+      "Execute multiple operations in a single call. "
+      "Each operation has a 'tool' name and 'arguments' object. "
+      "Operations execute sequentially; all results are returned. "
+      "Example: [{\"tool\": \"define_rule\", \"arguments\": {\"head\": \"...\", \"body\": \"...\"}}, "
+      "{\"tool\": \"query\", \"arguments\": {\"body\": \"...\"}}]")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'operations (hasheq
+          'type "array"
+          'items (hasheq
+            'type "object"
+            'properties (hasheq
+              'tool (hasheq 'type "string" 'description "Tool name")
+              'arguments (hasheq 'type "object" 'description "Tool arguments"))
+            'required '("tool"))
+          'description "Array of operations to execute"))
+      'required '("operations")))))
 
 ;; --- Tool handlers ---
 
@@ -502,10 +530,47 @@
     [("parse_program")
      (define source (hash-ref arguments 'source))
      (define fns (parse-program! source))
+     (define fn-lines
+       (for/list ([f (in-list fns)])
+         (format "  ~a: ~a" f (render-ref f))))
+     (define schema-names
+       '(("op" op-pred) ("left" left-pred) ("right" right-pred)
+         ("name" name-pred) ("body" body-pred) ("calls" calls-pred)
+         ("has-param" has-param-pred) ("position" position-pred)
+         ("symbol" symbol-predicate-id) ("supersedes" supersedes-pred)))
+     (define schema-lines
+       (for/list ([pair (in-list schema-names)])
+         (define name (first pair))
+         (define accessor (second pair))
+         (define id
+           (with-handlers ([exn:fail? (lambda (_) #f)])
+             (case accessor
+               [(op-pred) (op-pred)]
+               [(left-pred) (left-pred)]
+               [(right-pred) (right-pred)]
+               [(name-pred) (name-pred)]
+               [(body-pred) (body-pred)]
+               [(calls-pred) (calls-pred)]
+               [(has-param-pred) (has-param-pred)]
+               [(position-pred) (position-pred)]
+               [(symbol-predicate-id) (symbol-predicate-id)]
+               [(supersedes-pred) (supersedes-pred)])))
+         (format "  ~a: ~a" name (or id "?"))))
+     (define obj-count (length (all-objects)))
+     (define claim-count (length (claims-where)))
      (string-join
-      (cons (format "Parsed ~a function(s):" (length fns))
-            (for/list ([f (in-list fns)])
-              (format "  ~a: ~a" f (render-ref f))))
+      (append
+       (list (format "Parsed ~a function(s) (~a objects, ~a claims):"
+                     (length fns) obj-count claim-count))
+       fn-lines
+       (list "" "Schema (predicate name -> ID, usable as bare symbols in queries):")
+       schema-lines
+       (list "" "Built-in derived relations (already materialized):"
+             "  fn-depends-on(caller, callee) — function-level dependency"
+             "  contains-call(expr, fn) — transitive call-site containment"
+             ""
+             "Tip: In queries and rules, use bare symbol names instead of IDs."
+             "  e.g. (current-triple (? fn) body (? b)) instead of (current-triple (? fn) \"34\" (? b))"))
       "\n")]
 
     [("render")
@@ -526,6 +591,22 @@
      (define rules (length (ctx-ref 'rules '())))
      (define rule-ents (length (list-rule-entities)))
      (format "Objects: ~a\nClaims: ~a\nRules: ~a (~a as claims)" objs cls rules rule-ents)]
+
+    [("batch")
+     (define ops (hash-ref arguments 'operations))
+     (define results
+       (for/list ([op (in-list ops)]
+                  [i (in-naturals 1)])
+         (define tool-name (hash-ref op 'tool))
+         (define tool-args (hash-ref op 'arguments (hasheq)))
+         (define-values (result is-error)
+           (with-handlers ([exn:fail? (lambda (e)
+                             (values (exn-message e) #t))])
+             (values (handle-tool tool-name tool-args) #f)))
+         (if is-error
+             (format "[~a] ~a ERROR: ~a" i tool-name result)
+             (format "[~a] ~a:\n~a" i tool-name result))))
+     (string-join results "\n\n")]
 
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))

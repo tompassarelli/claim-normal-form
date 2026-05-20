@@ -14,3 +14,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 005 | 2026-05-20 | [Incremental rule addition](005-incremental-rule-addition.md) |
 | 006 | 2026-05-20 | [Live agent session: workflow comparison](006-live-agent-session.md) |
 | 007 | 2026-05-20 | [Incremental rule supersession](007-incremental-supersession.md) |
+| 008 | 2026-05-20 | [Interface redesign: the bottleneck shifted](008-interface-redesign.md) |
