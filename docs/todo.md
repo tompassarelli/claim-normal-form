@@ -237,19 +237,19 @@ Daemon mode supports multiple TCP clients. Three pieces completed:
    read/write locking or MVCC. Not needed yet but could be a big unlock
    for real multi-agent workflows.
 
-## LATER: Read/Write Locking or MVCC
+## DONE: Read/Write Locking
 
-Replace the global semaphore with fine-grained concurrency control.
-Options:
-- **Read/write locks** — multiple readers, exclusive writer. Queries
-  run in parallel, mutations serialize. Simple but doesn't help when
-  multiple agents mutate simultaneously.
-- **MVCC (multi-version concurrency control)** — each tx sees a
-  consistent snapshot. Readers never block writers. Transactions built
-  on top of the existing tx-seq numbering. More complex but enables
-  truly concurrent multi-agent collaboration without serialization.
+Replaced the global semaphore in daemon mode with a turnstile-based
+readers-writer lock. Multiple readers (queries, inspect, status, etc.)
+run concurrently. Writers (mutations, parse, define rules) get exclusive
+access. Writer blocks new readers and waits for existing readers to finish.
 
-This is a prerequisite for scaling beyond 2-3 agents on one daemon.
+11 read-only tools: query, inspect, resolve_symbol, claims_where,
+find_by, lookup, render, status, list_rules, tx_log, current_tx_seq.
+All others use write lock. 6 rwlock-specific tests.
+
+Full MVCC (snapshot isolation for concurrent writers) remains a LATER
+item — this covers the common case of parallel reads.
 
 ## DONE: Incremental Parse
 

@@ -970,12 +970,60 @@
                   'error (hasheq 'code -32601
                                  'message (format "Unknown method: ~a" method))))]))
 
+;; --- Read/Write lock (turnstile pattern) ---
+
+(struct rwlock (turnstile resource rmutex readers))
+
+(define (make-rwlock)
+  (rwlock (make-semaphore 1) (make-semaphore 1) (make-semaphore 1) (box 0)))
+
+(define (call-with-read-lock rwl thunk)
+  (semaphore-wait (rwlock-turnstile rwl))
+  (semaphore-post (rwlock-turnstile rwl))
+  (semaphore-wait (rwlock-rmutex rwl))
+  (define count (add1 (unbox (rwlock-readers rwl))))
+  (set-box! (rwlock-readers rwl) count)
+  (when (= count 1)
+    (semaphore-wait (rwlock-resource rwl)))
+  (semaphore-post (rwlock-rmutex rwl))
+  (with-handlers ([exn? (lambda (e) (rwlock-read-release! rwl) (raise e))])
+    (define result (thunk))
+    (rwlock-read-release! rwl)
+    result))
+
+(define (rwlock-read-release! rwl)
+  (semaphore-wait (rwlock-rmutex rwl))
+  (define count (sub1 (unbox (rwlock-readers rwl))))
+  (set-box! (rwlock-readers rwl) count)
+  (when (= count 0)
+    (semaphore-post (rwlock-resource rwl)))
+  (semaphore-post (rwlock-rmutex rwl)))
+
+(define (call-with-write-lock rwl thunk)
+  (semaphore-wait (rwlock-turnstile rwl))
+  (semaphore-wait (rwlock-resource rwl))
+  (with-handlers ([exn? (lambda (e)
+                   (semaphore-post (rwlock-resource rwl))
+                   (semaphore-post (rwlock-turnstile rwl))
+                   (raise e))])
+    (define result (thunk))
+    (semaphore-post (rwlock-resource rwl))
+    (semaphore-post (rwlock-turnstile rwl))
+    result))
+
+(define read-only-tools
+  '("query" "inspect" "resolve_symbol" "claims_where" "find_by"
+    "lookup" "render" "status" "list_rules" "tx_log" "current_tx_seq"))
+
+(define (read-only-tool? name)
+  (member name read-only-tools))
+
 ;; --- Daemon mode (TCP, shared state, multi-client) ---
 
 (define (run-daemon port-num)
   (define listener (tcp-listen port-num 5 #t))
-  (eprintf "cnf-daemon: listening on port ~a\n" port-num)
-  (define sem (make-semaphore 1))
+  (eprintf "cnf-daemon: listening on port ~a (read/write locking)\n" port-num)
+  (define lock (make-rwlock))
 
   (let accept-loop ()
     (define-values (in out) (tcp-accept listener))
@@ -992,7 +1040,12 @@
              [(string=? line "") (loop)]
              [else
               (define msg (string->jsexpr line))
-              (call-with-semaphore sem
+              (define tool-name
+                (and (equal? (hash-ref msg 'method #f) "tools/call")
+                     (hash-ref (hash-ref msg 'params (hasheq)) 'name #f)))
+              (define use-read-lock? (and tool-name (read-only-tool? tool-name)))
+              (define locker (if use-read-lock? call-with-read-lock call-with-write-lock))
+              (locker lock
                 (lambda ()
                   (define response (make-response msg))
                   (when response
