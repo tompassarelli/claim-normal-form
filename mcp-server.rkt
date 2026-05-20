@@ -513,7 +513,49 @@
       'properties (hasheq
         'name (hasheq 'type "string"
                       'description "Agent identifier (e.g. 'structural-analyst', 'quality-checker')"))
-      'required '("name")))))
+      'required '("name")))
+
+   ;; Incremental parse
+   (hasheq
+    'name "add_function"
+    'description (string-append
+      "Add a single function to the existing claim graph without reparsing. "
+      "The function's claims are added incrementally and materialized views auto-update. "
+      "Use this instead of reset + parse_program when adding functions to an existing graph.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'source (hasheq 'type "string"
+                        'description "Function definition, e.g. (defn foo (x y) (+ x y))"))
+      'required '("source")))
+
+   (hasheq
+    'name "remove_function"
+    'description (string-append
+      "Remove a function from the claim graph by invalidating all its claims "
+      "(params, body, expression tree). Materialized views auto-update — "
+      "derived relations like fn-depends-on retract affected tuples.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'name (hasheq 'type "string"
+                      'description "Function name to remove"))
+      'required '("name")))
+
+   (hasheq
+    'name "modify_function"
+    'description (string-append
+      "Modify an existing function's definition in-place. The function entity is preserved "
+      "(so other functions' call references still work), but params and body are replaced. "
+      "Materialized views auto-update through the change — no reparse needed.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'name (hasheq 'type "string"
+                      'description "Name of the function to modify")
+        'source (hasheq 'type "string"
+                        'description "New function definition, e.g. (defn foo (x y z) (* x (+ y z)))"))
+      'required '("name" "source")))))
 
 ;; --- Tool handlers ---
 
@@ -845,6 +887,35 @@
      (define agent-name (hash-ref arguments 'name))
      (ctx-set! 'current-agent agent-name)
      (format "Agent identity set to '~a'. All subsequent operations will be attributed to this agent." agent-name)]
+
+    [("add_function")
+     (define source (hash-ref arguments 'source))
+     (define fn-id (add-function! source))
+     (define fn-name (render-ref fn-id))
+     (define obj-count (length (all-objects)))
+     (define claim-count (length (claims-where)))
+     (format "Added function ~a (id: ~a). Graph: ~a objects, ~a claims."
+             fn-name fn-id obj-count claim-count)]
+
+    [("remove_function")
+     (define fn-name (hash-ref arguments 'name))
+     (define fn-id (remove-function! fn-name))
+     (define obj-count (length (all-objects)))
+     (define claim-count (length (claims-where)))
+     (format "Removed function ~a (id: ~a). Claims invalidated. Graph: ~a objects, ~a claims."
+             fn-name fn-id obj-count claim-count)]
+
+    [("modify_function")
+     (define fn-name (hash-ref arguments 'name))
+     (define source (hash-ref arguments 'source))
+     (define fn-id (modify-function! fn-name source))
+     (define new-name (render-ref fn-id))
+     (define obj-count (length (all-objects)))
+     (define claim-count (length (claims-where)))
+     (format "Modified function ~a~a (id: ~a). Graph: ~a objects, ~a claims."
+             fn-name
+             (if (equal? fn-name new-name) "" (format " → ~a" new-name))
+             fn-id obj-count claim-count)]
 
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))

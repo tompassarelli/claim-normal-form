@@ -4,6 +4,10 @@
 
 (provide setup-lang!
          parse-program!
+         add-function!
+         remove-function!
+         modify-function!
+         collect-expr-entities
          render-program
          render-fn
          render-expr
@@ -119,6 +123,84 @@
        (let ([cs (current-claims-where #:p (name-pred) #:r vid)])
          (and (not (null? cs))
               (list-ref (first cs) 2)))))
+
+;; --- Incremental parse ---
+
+(define (collect-expr-entities expr-id)
+  (cond
+    [(value-object? expr-id) '()]
+    [else
+     (define children '())
+     (define left-claims (current-claims-where #:l expr-id #:p (left-pred)))
+     (define right-claims (current-claims-where #:l expr-id #:p (right-pred)))
+     (when (not (null? left-claims))
+       (set! children (append children
+                             (collect-expr-entities (list-ref (first left-claims) 3)))))
+     (when (not (null? right-claims))
+       (set! children (append children
+                             (collect-expr-entities (list-ref (first right-claims) 3)))))
+     (cons expr-id children)]))
+
+(define (invalidate-entity-claims! entity-id)
+  (define claims (current-claims-where #:l entity-id))
+  (for ([c (in-list claims)])
+    (invalidate! (first c))))
+
+(define (retract-function-internals! fn-id)
+  (define params (get-ordered-params fn-id))
+  (for ([p (in-list params)])
+    (invalidate-entity-claims! p))
+  (define body-claims (current-claims-where #:l fn-id #:p (body-pred)))
+  (when (not (null? body-claims))
+    (define body-id (list-ref (first body-claims) 3))
+    (define expr-entities (collect-expr-entities body-id))
+    (for ([e (in-list expr-entities)])
+      (invalidate-entity-claims! e)))
+  (define param-claims (current-claims-where #:l fn-id #:p (has-param-pred)))
+  (for ([c (in-list param-claims)])
+    (invalidate! (first c)))
+  (for ([c (in-list body-claims)])
+    (invalidate! (first c))))
+
+(define (add-function! source)
+  (define port (open-input-string source))
+  (define form (read port))
+  (parse-defn! form))
+
+(define (remove-function! fn-name)
+  (define fn-id (resolve-fn-name (string->symbol fn-name)))
+  (unless fn-id
+    (error 'remove-function! "unknown function: ~a" fn-name))
+  (retract-function-internals! fn-id)
+  (invalidate-entity-claims! fn-id)
+  fn-id)
+
+(define (modify-function! fn-name new-source)
+  (define fn-id (resolve-fn-name (string->symbol fn-name)))
+  (unless fn-id
+    (error 'modify-function! "unknown function: ~a" fn-name))
+  (retract-function-internals! fn-id)
+  (define port (open-input-string new-source))
+  (define form (read port))
+  (match form
+    [(list 'defn (? symbol? name) (list (? symbol? params) ...) body)
+     (unless (equal? (symbol->string name) fn-name)
+       (rename! fn-id (symbol->string name)))
+     (define param-entities
+       (for/list ([p (in-list params)]
+                  [i (in-naturals)])
+         (define param (entity!))
+         (give-name! param (symbol->string p))
+         (claim! fn-id (has-param-pred) param)
+         (claim! param (position-pred) (value! i))
+         param))
+     (define scope (make-hash))
+     (for ([p (in-list params)]
+           [e (in-list param-entities)])
+       (hash-set! scope p e))
+     (define body-expr (parse-expr! body scope))
+     (claim! fn-id (body-pred) body-expr)
+     fn-id]))
 
 ;; --- Renderer ---
 

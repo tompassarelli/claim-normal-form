@@ -251,15 +251,21 @@ Options:
 
 This is a prerequisite for scaling beyond 2-3 agents on one daemon.
 
-## LATER: Incremental Parse
+## DONE: Incremental Parse
 
-The missing piece from E9. Currently, mutations require reset + full
-reparse, destroying accumulated rules. With incremental parse,
-mutations flow through the claim graph: add/remove/modify individual
-function claims without touching the rest. Matviews auto-update through
-the change. This is the scenario where CNF should decisively win over
-text — the agent edits code and the structural understanding updates
-live, no reparse needed.
+Three new MCP tools: `add_function`, `remove_function`, `modify_function`.
+30 MCP tools (was 27).
+
+- `add_function`: parses a single function definition and adds it to the
+  existing claim graph. Matview hooks fire incrementally.
+- `remove_function`: finds the function entity by name, walks its expression
+  tree, and invalidates all owned claims via supersession. Derived relations
+  (fn-depends-on, contains-call) retract affected tuples automatically.
+- `modify_function`: preserves the function entity ID (so other functions'
+  call references still work), retracts old params + body, parses new
+  definition reusing the entity. Can rename simultaneously.
+
+15 lang tests (was 8). All 68 tests passing.
 
 ## LATER: Real Codebase Demo
 
