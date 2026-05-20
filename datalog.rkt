@@ -12,22 +12,20 @@
          set-supersedes-pred!
          current-claims-where)
 
-;; Datalog over CNF — index-aware evaluation.
+;; Datalog over CNF — semi-naive evaluation with index-aware joins.
 ;;
-;; Base relations (EDB) dispatch to the live claim store using
-;; hash indexes. Bound variables from prior joins constrain the
-;; lookup, avoiding full scans.
+;; Two-tier relation model:
+;;   EDB (base): claim, triple, current-claim, current-triple, value, object
+;;     — dispatched to the live claim store via hash indexes
+;;   IDB (derived): everything else
+;;     — accumulated during fixpoint in set-based hash tables
 ;;
-;; Derived relations (IDB) accumulate during fixpoint iteration
-;; in a separate hash.
-;;
-;; Base relations:
-;;   (claim Id L P R)
-;;   (triple L P R)
-;;   (current-claim Id L P R) — unsuperseded only
-;;   (current-triple L P R)   — unsuperseded only
-;;   (value Id Literal)
-;;   (object Id)
+;; Semi-naive evaluation:
+;;   1. EDB-only rules fire once (Phase 1). Skipped in all iterations.
+;;   2. IDB rules iterate with delta restriction: on each iteration,
+;;      at least one IDB body atom uses only NEW facts from the
+;;      previous iteration. Avoids re-deriving known tuples.
+;;   3. Fixpoint when no new facts are derived.
 
 (struct var (name) #:transparent)
 (struct atom (rel args) #:transparent)
@@ -103,16 +101,25 @@
          [else #f]))
      (and s (match-tuple (cdr pattern) (cdr tuple) s))]))
 
-;; --- Index-aware base relation evaluation ---
+;; --- Relation classification ---
+
+(define edb-relations '(claim triple current-claim current-triple value object))
+
+(define (edb-rel? rel)
+  (memq rel edb-relations))
+
+(define (idb-body-positions body-atoms)
+  (for/list ([a (in-list body-atoms)]
+             [i (in-naturals)]
+             #:when (not (edb-rel? (atom-rel a))))
+    i))
+
+;; --- Index-aware EDB evaluation ---
 ;;
 ;; claims-where returns rows as (cid p l r).
 ;; Base relation tuple layouts:
-;;   triple:         (L P R)       = (row[2] row[1] row[3])
-;;   claim:          (Id L P R)    = (row[0] row[2] row[1] row[3])
-;;   current-triple: same as triple, filtered by superseded?
-;;   current-claim:  same as claim, filtered by superseded?
-
-(define edb-relations '(claim triple current-claim current-triple value object))
+;;   triple:         (L P R)    = (row[2] row[1] row[3])
+;;   claim:          (Id L P R) = (row[0] row[2] row[1] row[3])
 
 (define (resolve-arg arg subst)
   (if (var? arg)
@@ -196,24 +203,51 @@
       (lambda (t) (match-tuple args t subst))
       (for/list ([id (all-objects)]) (list id)))]))
 
+(define (match-atom-edb a subst)
+  (define args (atom-args a))
+  (define resolved (map (lambda (x) (resolve-arg x subst)) args))
+  (case (atom-rel a)
+    [(current-triple) (eval-triple-base args resolved subst #t)]
+    [(triple)         (eval-triple-base args resolved subst #f)]
+    [(current-claim)  (eval-claim-base args resolved subst #t)]
+    [(claim)          (eval-claim-base args resolved subst #f)]
+    [(value)          (eval-value-base args resolved subst)]
+    [(object)         (eval-object-base args resolved subst)]))
+
+;; --- Set-based IDB storage ---
+
+(define (db-add! db rel tuple)
+  (define existing (hash-ref db rel (set)))
+  (cond
+    [(set-member? existing tuple) #f]
+    [else
+     (hash-set! db rel (set-add existing tuple))
+     #t]))
+
+(define (db-tuples db rel)
+  (set->list (hash-ref db rel (set))))
+
+(define (db-empty? db)
+  (for/and ([(rel tuples) (in-hash db)])
+    (set-empty? tuples)))
+
+;; --- Atom matching (query-time, list-based db) ---
+
 (define (match-atom db a subst)
   (define rel (atom-rel a))
-  (define args (atom-args a))
   (cond
-    [(memq rel edb-relations)
-     (define resolved (map (lambda (x) (resolve-arg x subst)) args))
-     (case rel
-       [(current-triple) (eval-triple-base args resolved subst #t)]
-       [(triple)         (eval-triple-base args resolved subst #f)]
-       [(current-claim)  (eval-claim-base args resolved subst #t)]
-       [(claim)          (eval-claim-base args resolved subst #f)]
-       [(value)          (eval-value-base args resolved subst)]
-       [(object)         (eval-object-base args resolved subst)])]
+    [(edb-rel? rel) (match-atom-edb a subst)]
     [else
      (define tuples (hash-ref db rel '()))
-     (filter-map (lambda (t) (match-tuple args t subst)) tuples)]))
+     (filter-map (lambda (t) (match-tuple (atom-args a) t subst)) tuples)]))
 
-;; --- Body evaluation ---
+;; --- Atom matching (fixpoint-time, set-based db) ---
+
+(define (match-atom-idb db a subst)
+  (define tuples (db-tuples db (atom-rel a)))
+  (filter-map (lambda (t) (match-tuple (atom-args a) t subst)) tuples))
+
+;; --- Body evaluation (query-time) ---
 
 (define (eval-body db atoms subst)
   (cond
@@ -224,47 +258,116 @@
                  [result (in-list (eval-body db (cdr atoms) s))])
        result)]))
 
-;; --- Rule application ---
+;; --- Semi-naive engine ---
 
-(define (apply-dl-rule db r)
-  (define substs (eval-body db (dl-rule-body r) (hasheq)))
-  (for/list ([s (in-list substs)])
-    (cons (atom-rel (dl-rule-head r))
-          (for/list ([a (in-list (atom-args (dl-rule-head r)))])
-            (if (var? a)
-                (hash-ref s (var-name a))
-                a)))))
+(define (classify-rules rules)
+  (partition
+   (lambda (r)
+     (for/and ([a (in-list (dl-rule-body r))])
+       (edb-rel? (atom-rel a))))
+   rules))
 
-;; --- Fixpoint ---
+(define (instantiate-head r subst)
+  (cons (atom-rel (dl-rule-head r))
+        (for/list ([a (in-list (atom-args (dl-rule-head r)))])
+          (if (var? a)
+              (hash-ref subst (var-name a))
+              a))))
 
-(define (iterate-once db rs)
-  (define new-db (hash-copy db))
-  (define changed? #f)
-  (for* ([r (in-list rs)]
-         [d (in-list (apply-dl-rule db r))])
-    (define rel (car d))
-    (define tuple (cdr d))
-    (define existing (hash-ref new-db rel '()))
-    (unless (member tuple existing)
-      (hash-set! new-db rel (cons tuple existing))
-      (set! changed? #t)))
-  (values new-db changed?))
+;; Evaluate rule body where all IDB atoms use full-db.
+(define (eval-body-full full-db atoms subst)
+  (cond
+    [(null? atoms) (list subst)]
+    [else
+     (define a (car atoms))
+     (define matches
+       (if (edb-rel? (atom-rel a))
+           (match-atom-edb a subst)
+           (match-atom-idb full-db a subst)))
+     (for*/list ([s (in-list matches)]
+                 [result (in-list (eval-body-full full-db (cdr atoms) s))])
+       result)]))
 
-(define (fixpoint db rs)
-  (define-values (new-db changed?) (iterate-once db rs))
-  (if changed?
-      (fixpoint new-db rs)
-      new-db))
+;; Evaluate rule body where atom at delta-pos uses delta-db,
+;; other IDB atoms use full-db, EDB atoms use claim store.
+(define (eval-body-semi full-db delta-db atoms delta-pos subst)
+  (define (go atoms idx subst)
+    (cond
+      [(null? atoms) (list subst)]
+      [else
+       (define a (car atoms))
+       (define rel (atom-rel a))
+       (define matches
+         (cond
+           [(edb-rel? rel) (match-atom-edb a subst)]
+           [(= idx delta-pos) (match-atom-idb delta-db a subst)]
+           [else (match-atom-idb full-db a subst)]))
+       (for*/list ([s (in-list matches)]
+                   [result (in-list (go (cdr atoms) (add1 idx) s))])
+         result)]))
+  (go atoms 0 subst))
+
+(define (fixpoint-semi-naive rules)
+  (define-values (edb-only-rules idb-rules) (classify-rules rules))
+
+  ;; Phase 1: evaluate all rules once against empty IDB.
+  ;; Only EDB-only rules produce results here.
+  (define full-db (make-hash))
+  (define delta-db (make-hash))
+
+  (for* ([r (in-list rules)]
+         [subst (in-list (eval-body-full full-db (dl-rule-body r) (hasheq)))])
+    (define d (instantiate-head r subst))
+    (when (db-add! full-db (car d) (cdr d))
+      (db-add! delta-db (car d) (cdr d))))
+
+  ;; Phase 2: iterate with delta restriction.
+  ;; Only IDB rules participate. For each rule, evaluate N variants
+  ;; where N = number of IDB body positions. Each variant restricts
+  ;; one IDB atom to delta (new facts only).
+  (let loop ()
+    (define new-delta (make-hash))
+
+    (for* ([r (in-list idb-rules)])
+      (define body (dl-rule-body r))
+      (define positions (idb-body-positions body))
+      (for* ([delta-pos (in-list positions)]
+             [subst (in-list (eval-body-semi full-db delta-db body
+                                             delta-pos (hasheq)))])
+        (define d (instantiate-head r subst))
+        (define existing (hash-ref full-db (car d) (set)))
+        (unless (set-member? existing (cdr d))
+          (db-add! new-delta (car d) (cdr d)))))
+
+    (cond
+      [(db-empty? new-delta)
+       ;; Fixpoint reached. Convert to list-based format for query eval.
+       (define result (make-hash))
+       (for ([(rel tuples) (in-hash full-db)])
+         (hash-set! result rel (set->list tuples)))
+       result]
+      [else
+       ;; Merge new-delta into full-db and iterate.
+       (for* ([(rel tuples) (in-hash new-delta)]
+              [t (in-set tuples)])
+         (db-add! full-db rel t))
+       (set! delta-db new-delta)
+       (loop)])))
 
 ;; --- Query ---
 
+(define (resolve-if-edb a)
+  (if (edb-rel? (atom-rel a))
+      (resolve-atom-literals a)
+      a))
+
 (define (run-query body-atoms)
-  (define resolved-query (map resolve-atom-literals body-atoms))
+  (define resolved-query (map resolve-if-edb body-atoms))
   (define resolved-rules
     (for/list ([r (in-list (ctx-ref 'rules '()))])
-      (dl-rule (resolve-atom-literals (dl-rule-head r))
-               (map resolve-atom-literals (dl-rule-body r)))))
-  (define db (fixpoint (make-hash) resolved-rules))
+      (dl-rule (dl-rule-head r)
+               (map resolve-if-edb (dl-rule-body r)))))
+  (define db (fixpoint-semi-naive resolved-rules))
   (eval-body db resolved-query (hasheq)))
 
 (define (show-results results)

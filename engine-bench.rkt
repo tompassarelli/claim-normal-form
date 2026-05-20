@@ -97,7 +97,7 @@
 (displayln "")
 (displayln "Comparing CNF graph operations against text-based equivalents.")
 (displayln "CNF advantages grow with scale (rename is O(1), deps are indexed).")
-(displayln "CNF weakness: Datalog fixpoint is still naive (full recompute).")
+(displayln "CNF uses semi-naive evaluation (delta restriction per iteration).")
 
 (for ([n '(10 50 100 200)])
   (run-benchmark n))
@@ -110,7 +110,7 @@
 (displayln "- 'Rename+render 1' is the agent scenario: rename a function,")
 (displayln "  verify one call site. CNF rename is O(1), rendering is O(fn).")
 (displayln "- 'Text replace all' must scan every source string — O(N).")
-(displayln "- Datalog dep query is still naive fixpoint. Semi-naive +")
-(displayln "  materialized views would make it competitive with grep at scale.")
+(displayln "- Datalog dep query uses semi-naive fixpoint. Materialized")
+(displayln "  views would make it competitive with grep at scale.")
 (displayln "- The index-aware engine avoids full EDB copy and uses claim")
 (displayln "  indexes during joins (idx-by-l, idx-by-lp, idx-by-pr).")

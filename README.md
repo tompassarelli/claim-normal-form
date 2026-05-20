@@ -68,7 +68,7 @@ graphs via `parameterize`:
 
 ## Datalog (`datalog.rkt`)
 
-Bottom-up naive fixpoint evaluation over the claim graph.
+Semi-naive bottom-up evaluation over the claim graph.
 
 ```racket
 (require "cnf.rkt" "datalog.rkt")
@@ -253,18 +253,25 @@ Run `racket lang-demo.rkt` for the full thesis demonstration.
 
 ## Performance
 
-The Datalog engine uses **index-aware evaluation**: base relation
-lookups (`current-triple`, `triple`, `value`, etc.) dispatch to
-hash indexes during joins rather than scanning all tuples.
-Supersession state is maintained incrementally — `current-claims-where`
-is O(matching) not O(all supersession claims).
+The Datalog engine uses **semi-naive evaluation** with
+**index-aware base relation dispatch**:
+
+- **Semi-naive fixpoint**: EDB-only rules fire once. IDB rules
+  iterate with delta restriction — each iteration only considers
+  rule variants where at least one IDB body atom uses new facts
+  from the previous iteration. Avoids redundant re-derivation.
+- **Index-aware joins**: base relation lookups (`current-triple`,
+  `triple`, `value`, etc.) dispatch to hash indexes during joins
+  rather than scanning all tuples.
+- **Maintained supersession**: `current-claims-where` is O(matching)
+  not O(all supersession claims).
 
 Incremental recompute touches only the affected subgraph:
 
 ```
 105 expressions (5-deep chain + 100 independent)
-Full build:        ~930 ms
-Incremental (5):   ~90 ms   (10x faster, 100 nodes untouched)
+Full build:        ~1100 ms
+Incremental (5):   ~90 ms   (12x faster, 100 nodes untouched)
 ```
 
 Run `racket bench.rkt` to reproduce.
@@ -274,20 +281,19 @@ Agent-oriented operations at scale:
 ```
 200 functions (chain dependencies)
 Rename + render 1 fn:  < 0.1 ms  (O(1) — constant regardless of N)
-Render all 200:        ~2 ms
-Dependency query:      ~34 ms   (Datalog fixpoint — the bottleneck)
+Render all 200:        ~3 ms
+Dependency query:      ~39 ms   (Datalog semi-naive fixpoint)
 Text string-replace:   ~0.1 ms  (for comparison)
 ```
 
 Run `racket engine-bench.rkt` to reproduce.
 
 **Honest limitations:**
-- Datalog still uses naive bottom-up fixpoint. Each query recomputes
-  all derived facts from scratch. Semi-naive evaluation would avoid
-  redundant re-derivation.
+- Each query still recomputes all derived facts from scratch
+  (no materialized views). Semi-naive avoids redundant
+  re-derivation within a fixpoint but doesn't cache across queries.
 - The incremental win comes from evaluating fewer steps (5 instead
-  of 105), not from faster individual steps. Each step is ~4x faster
-  with index-aware evaluation than the naive EDB-copy approach.
+  of 105), not from faster individual steps.
 - Dependency queries via Datalog are slower than grep for simple
   cases. The structural advantage is correctness (guaranteed complete
   transitive closure) not speed.
@@ -296,7 +302,7 @@ Run `racket engine-bench.rkt` to reproduce.
 
 ```
 racket cnf-test.rkt      # 11 kernel tests
-racket datalog-test.rkt  # 9 datalog tests
+racket datalog-test.rkt  # 12 datalog tests
 racket eval-test.rkt     # 6 evaluator tests
 racket demo-test.rkt     # 8 graph layer tests
 racket schema-test.rkt   # 10 schema layer tests

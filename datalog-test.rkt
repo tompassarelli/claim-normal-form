@@ -152,5 +152,93 @@
   (check-false (ormap (λ (s) (equal? (hash-ref s 'x) lonely)) results))
   (displayln "PASS 9 — literal resolution in rule bodies"))
 
+;; 10. Diamond graph — no duplicate tuples in transitive closure
+(reset-store!)
+(reset-rules!)
+
+(let ()
+  (define ep (named! "edge"))
+  (define n1 (named! "n1"))
+  (define n2 (named! "n2"))
+  (define n3 (named! "n3"))
+  (define n4 (named! "n4"))
+  ;; Diamond: n1->n2, n1->n3, n2->n4, n3->n4
+  (void (claim! n1 ep n2))
+  (void (claim! n1 ep n3))
+  (void (claim! n2 ep n4))
+  (void (claim! n3 ep n4))
+
+  (define-rule (reach (? x) (? y))
+    (triple (? x) ep (? y)))
+  (define-rule (reach (? x) (? z))
+    (triple (? x) ep (? y))
+    (reach (? y) (? z)))
+
+  (define results (query (reach (? from) (? to))))
+  ;; n1->n2, n1->n3, n1->n4, n2->n4, n3->n4 = 5 paths
+  ;; n1->n4 must appear exactly once despite two diamond paths
+  (define n1-to-n4
+    (filter (λ (s) (and (equal? (hash-ref s 'from) n1)
+                        (equal? (hash-ref s 'to) n4)))
+            results))
+  (check-equal? (length n1-to-n4) 1)
+  (check-equal? (length results) 5)
+  (displayln "PASS 10 — diamond graph, no duplicate tuples"))
+
+;; 11. Multiple IDB body atoms — join across two derived relations
+(reset-store!)
+(reset-rules!)
+
+(let ()
+  (define ep (named! "edge"))
+  (define tp (named! "type"))
+  (define a (named! "a"))
+  (define b (named! "b"))
+  (define c (named! "c"))
+  (void (claim! a ep b))
+  (void (claim! b ep c))
+  (void (claim! a tp (value! "source")))
+  (void (claim! c tp (value! "sink")))
+
+  (define-rule (reach2 (? x) (? y))
+    (triple (? x) ep (? y)))
+  (define-rule (reach2 (? x) (? z))
+    (triple (? x) ep (? y))
+    (reach2 (? y) (? z)))
+
+  (define-rule (typed (? x) (? t))
+    (triple (? x) tp (? tv))
+    (value (? tv) (? t)))
+
+  ;; Rule with two IDB body atoms
+  (define-rule (source-to-sink (? s) (? t))
+    (typed (? s) "source")
+    (reach2 (? s) (? t))
+    (typed (? t) "sink"))
+
+  (define results (query (source-to-sink (? src) (? dst))))
+  (check-equal? (length results) 1)
+  (check-equal? (hash-ref (first results) 'src) a)
+  (check-equal? (hash-ref (first results) 'dst) c)
+  (displayln "PASS 11 — multiple IDB body atoms join correctly"))
+
+;; 12. EDB-only rules terminate without IDB iteration
+(reset-store!)
+(reset-rules!)
+
+(let ()
+  (define p (named! "color"))
+  (define x (named! "sky"))
+  (claim! x p (value! "blue"))
+
+  (define-rule (colored (? obj) (? color))
+    (triple (? obj) p (? cv))
+    (value (? cv) (? color)))
+
+  (define results (query (colored (? what) (? col))))
+  (check-equal? (length results) 1)
+  (check-equal? (hash-ref (first results) 'col) "blue")
+  (displayln "PASS 12 — EDB-only rule fires without IDB iteration"))
+
 (displayln "")
 (displayln "All Datalog tests passed.")
