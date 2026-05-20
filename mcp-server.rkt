@@ -6,6 +6,7 @@
 ;; An AI agent connects via MCP and operates on the claim graph directly.
 
 (require json
+         racket/tcp
          "cnf.rkt"
          "datalog.rkt"
          "eval.rkt"
@@ -40,6 +41,107 @@
   (setup-rule-predicates!)
   (setup-lang!)
   (materialize!))
+
+(define default-checkpoint-path
+  (build-path (find-system-path 'home-dir) ".cnf" "checkpoint.json"))
+
+;; --- Restore from checkpoint ---
+
+(define (register-builtin-rules!)
+  (define-rule (operand-val (? operand) (? operand))
+    (value (? operand) (? _lit)))
+  (define-rule (operand-val (? operand) (? result-val))
+    (current-triple (? ev) (evaluated-pred) (? operand))
+    (current-triple (? ev) (result-pred) (? result-val)))
+  (define-rule (ready (? expr) (? op) (? lval) (? rval))
+    (current-triple (? expr) (op-pred) (? op))
+    (current-triple (? expr) (left-pred) (? left))
+    (current-triple (? expr) (right-pred) (? right))
+    (operand-val (? left) (? lval))
+    (operand-val (? right) (? rval)))
+  (define-rule (expr-depends-on (? expr) (? dep))
+    (current-triple (? expr) (left-pred) (? dep))
+    (current-triple (? dep) (op-pred) (? _op1)))
+  (define-rule (expr-depends-on (? expr) (? dep))
+    (current-triple (? expr) (right-pred) (? dep))
+    (current-triple (? dep) (op-pred) (? _op2)))
+  (define-rule (affected (? x) (? changed))
+    (expr-depends-on (? x) (? changed)))
+  (define-rule (affected (? x) (? changed))
+    (expr-depends-on (? x) (? y))
+    (affected (? y) (? changed)))
+  (define bp (body-pred))
+  (define cp (calls-pred))
+  (define lp (left-pred))
+  (define rp (right-pred))
+  (define-rule (contains-call (? expr) (? fn))
+    (current-triple (? expr) cp (? fn)))
+  (define-rule (contains-call (? expr) (? fn))
+    (current-triple (? expr) lp (? child))
+    (contains-call (? child) (? fn)))
+  (define-rule (contains-call (? expr) (? fn))
+    (current-triple (? expr) rp (? child))
+    (contains-call (? child) (? fn)))
+  (define-rule (fn-depends-on (? caller) (? callee))
+    (current-triple (? caller) bp (? body))
+    (contains-call (? body) (? callee)))
+  (void))
+
+(define (restore-workspace! data)
+  (current-ctx (make-blank-ctx))
+  (import-store! data)
+
+  (define (find-pred name key)
+    (define id (resolve-symbol name))
+    (when id (ctx-set! key id)))
+
+  (find-pred "op" 'op-pred)
+  (find-pred "left" 'left-pred)
+  (find-pred "right" 'right-pred)
+  (find-pred "evaluated" 'evaluated-pred)
+  (find-pred "result" 'result-pred)
+  (find-pred "under-env" 'under-env-pred)
+  (find-pred "name" 'name-pred)
+  (find-pred "supersedes" 'supersedes-pred)
+  (set-supersedes-pred! (ctx-ref 'supersedes-pred))
+  (find-pred "has-param" 'has-param)
+  (find-pred "position" 'position-pred)
+  (find-pred "body" 'body-pred)
+  (find-pred "calls" 'calls-pred)
+  (find-pred "rule-head-rel" 'rule-head-rel-pred-id)
+  (find-pred "rule-source" 'rule-source-pred-id)
+
+  (ctx-set! 'primitives (make-hash))
+  (ctx-set! 'builtins (make-hash))
+  (for ([pair (list (cons "+" +) (cons "-" -) (cons "*" *) (cons "/" /))])
+    (define id (resolve-symbol (car pair)))
+    (when id
+      (register-primitive! id (cdr pair))
+      (hash-set! (ctx-ref 'builtins) (string->symbol (car pair)) id)))
+
+  (ctx-set! 'rules '())
+  (register-builtin-rules!)
+  (ctx-set! 'rule-entities (make-hash))
+  (restore-user-rules!)
+  (materialize!))
+
+(define (restore-user-rules!)
+  (define rhrp (rule-head-rel-pred))
+  (define rsp (rule-source-pred))
+  (when (and rhrp rsp)
+    (define head-claims (current-claims-where #:p rhrp))
+    (for ([c (in-list head-claims)])
+      (define rule-ent (list-ref c 2))
+      (define src-claims (current-claims-where #:l rule-ent #:p rsp))
+      (when (not (null? src-claims))
+        (define src-str (resolve-value (list-ref (first src-claims) 3)))
+        (define parts (regexp-split #rx" :- " src-str))
+        (when (= (length parts) 2)
+          (define head-atom (parse-atom-sexpr (read (open-input-string (first parts)))))
+          (define body-atoms (parse-clauses (second parts)))
+          (define rule (dl-rule head-atom body-atoms))
+          (ctx-set! 'rules (cons rule (ctx-ref 'rules '())))
+          (hash-set! (ctx-ref 'rule-entities) rule-ent rule))))))
 
 ;; --- S-expression query parsing ---
 
@@ -350,7 +452,31 @@
               'arguments (hasheq 'type "object" 'description "Tool arguments"))
             'required '("tool"))
           'description "Array of operations to execute"))
-      'required '("operations")))))
+      'required '("operations")))
+
+   (hasheq
+    'name "checkpoint"
+    'description (string-append
+      "Save the entire claim graph to disk. Preserves all objects, values, claims, "
+      "rules, and supersession history. A subsequent restore reconstructs the full "
+      "graph including materialized views — agents resume with accumulated knowledge.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'path (hasheq 'type "string"
+                      'description "File path (default: ~/.cnf/checkpoint.json)"))))
+
+   (hasheq
+    'name "restore"
+    'description (string-append
+      "Restore a previously checkpointed claim graph. All objects, values, claims, "
+      "rules, and materialized views are reconstructed. The agent resumes with full "
+      "structural understanding from a prior session.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'path (hasheq 'type "string"
+                      'description "File path (default: ~/.cnf/checkpoint.json)"))))))
 
 ;; --- Tool handlers ---
 
@@ -614,37 +740,58 @@
              (format "[~a] ~a:\n~a" i tool-name result))))
      (string-join results "\n\n")]
 
+    [("checkpoint")
+     (define path (hash-ref arguments 'path (path->string default-checkpoint-path)))
+     (define dir (path-only path))
+     (when (and dir (not (directory-exists? dir)))
+       (make-directory* dir))
+     (define data (export-store))
+     (call-with-output-file path #:exists 'replace
+       (lambda (out) (write-json data out)))
+     (format "Checkpoint saved: ~a (~a objects, ~a claims)"
+             path (length (hash-ref data 'objects)) (length (hash-ref data 'claims)))]
+
+    [("restore")
+     (define path (hash-ref arguments 'path (path->string default-checkpoint-path)))
+     (unless (file-exists? path)
+       (error 'restore "checkpoint not found: ~a" path))
+     (define data (call-with-input-file path read-json))
+     (restore-workspace! data)
+     (define rule-count (length (ctx-ref 'rules '())))
+     (define user-rules (length (list-rule-entities)))
+     (format "Restored from ~a (~a objects, ~a claims, ~a rules [~a builtin, ~a user])"
+             path (length (all-objects)) (length (claims-where))
+             rule-count (- rule-count user-rules) user-rules)]
+
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))
 
-;; --- JSON-RPC dispatch ---
+;; --- JSON-RPC dispatch (transport-independent) ---
 
-(define (handle-request msg)
+(define (make-response msg)
   (define method (hash-ref msg 'method #f))
   (define id (hash-ref msg 'id #f))
   (define params (hash-ref msg 'params (hasheq)))
 
   (case method
     [("initialize")
-     (send-response
-      (hasheq 'jsonrpc "2.0"
-              'id id
-              'result (hasheq
-                'protocolVersion "2024-11-05"
-                'capabilities (hasheq 'tools (hasheq))
-                'serverInfo (hasheq 'name "cnf-server"
-                                    'version "0.1.0"))))]
+     (hasheq 'jsonrpc "2.0"
+             'id id
+             'result (hasheq
+               'protocolVersion "2024-11-05"
+               'capabilities (hasheq 'tools (hasheq))
+               'serverInfo (hasheq 'name "cnf-server"
+                                   'version "0.2.0")))]
 
-    [("notifications/initialized") (void)]
+    [("notifications/initialized") #f]
 
     [("ping")
-     (send-response (hasheq 'jsonrpc "2.0" 'id id 'result (hasheq)))]
+     (hasheq 'jsonrpc "2.0" 'id id 'result (hasheq))]
 
     [("tools/list")
-     (send-response
-      (hasheq 'jsonrpc "2.0"
-              'id id
-              'result (hasheq 'tools tool-defs)))]
+     (hasheq 'jsonrpc "2.0"
+             'id id
+             'result (hasheq 'tools tool-defs))]
 
     [("tools/call")
      (define tool-name (hash-ref params 'name))
@@ -654,32 +801,118 @@
                          (values (exn-message e) #t))])
          (values (handle-tool tool-name arguments) #f)))
      (define text (if (string? result) result (format "~a" result)))
-     (send-response
-      (hasheq 'jsonrpc "2.0"
-              'id id
-              'result
-              (let ([content (list (hasheq 'type "text" 'text text))])
-                (if is-error
-                    (hasheq 'content content 'isError #t)
-                    (hasheq 'content content)))))]
+     (hasheq 'jsonrpc "2.0"
+             'id id
+             'result
+             (let ([content (list (hasheq 'type "text" 'text text))])
+               (if is-error
+                   (hasheq 'content content 'isError #t)
+                   (hasheq 'content content))))]
 
     [else
-     (when id
-       (send-response
-        (hasheq 'jsonrpc "2.0"
-                'id id
-                'error (hasheq 'code -32601
-                               'message (format "Unknown method: ~a" method)))))]))
+     (and id
+          (hasheq 'jsonrpc "2.0"
+                  'id id
+                  'error (hasheq 'code -32601
+                                 'message (format "Unknown method: ~a" method))))]))
+
+;; --- Daemon mode (TCP, shared state, multi-client) ---
+
+(define (run-daemon port-num)
+  (define listener (tcp-listen port-num 5 #t))
+  (eprintf "cnf-daemon: listening on port ~a\n" port-num)
+  (define sem (make-semaphore 1))
+
+  (let accept-loop ()
+    (define-values (in out) (tcp-accept listener))
+    (eprintf "cnf-daemon: client connected\n")
+    (thread
+     (lambda ()
+       (with-handlers ([exn:fail? (lambda (e)
+                         (eprintf "cnf-daemon: client error: ~a\n" (exn-message e)))])
+         (let loop ()
+           (define line (read-line in 'any))
+           (cond
+             [(eof-object? line)
+              (eprintf "cnf-daemon: client disconnected\n")]
+             [(string=? line "") (loop)]
+             [else
+              (define msg (string->jsexpr line))
+              (call-with-semaphore sem
+                (lambda ()
+                  (define response (make-response msg))
+                  (when response
+                    (write-json response out)
+                    (write-char #\newline out)
+                    (flush-output out))))
+              (loop)])))
+       (close-input-port in)
+       (close-output-port out)))
+    (accept-loop)))
+
+;; --- Bridge mode (stdio ↔ TCP proxy for Claude Code) ---
+
+(define (run-bridge port-num)
+  (define-values (tcp-in tcp-out) (tcp-connect "127.0.0.1" port-num))
+  (eprintf "cnf-bridge: connected to daemon on port ~a\n" port-num)
+
+  (thread
+   (lambda ()
+     (let loop ()
+       (define line (read-line tcp-in 'any))
+       (cond
+         [(eof-object? line)
+          (eprintf "cnf-bridge: daemon disconnected\n")]
+         [else
+          (write-string line mcp-out)
+          (write-char #\newline mcp-out)
+          (flush-output mcp-out)
+          (loop)]))))
+
+  (let loop ()
+    (define line (read-line (current-input-port) 'any))
+    (cond
+      [(eof-object? line)
+       (close-output-port tcp-out)
+       (close-input-port tcp-in)]
+      [(string=? line "") (loop)]
+      [else
+       (write-string line tcp-out)
+       (write-char #\newline tcp-out)
+       (flush-output tcp-out)
+       (loop)])))
 
 ;; --- Main ---
 
-(init-workspace!)
-(eprintf "cnf-server: ready\n")
+(define args (current-command-line-arguments))
 
-(let loop ()
-  (define msg (read-message))
-  (when msg
-    (with-handlers ([exn:fail? (lambda (e)
-                      (eprintf "cnf-server error: ~a\n" (exn-message e)))])
-      (handle-request msg))
-    (loop)))
+(let ([mode (and (>= (vector-length args) 1) (vector-ref args 0))]
+      [arg2 (and (>= (vector-length args) 2) (vector-ref args 1))])
+  (cond
+    ;; Daemon mode: TCP server, auto-restores from checkpoint
+    [(equal? mode "--daemon")
+     (let ([port-num (string->number arg2)])
+       (if (file-exists? default-checkpoint-path)
+           (let ([data (call-with-input-file default-checkpoint-path read-json)])
+             (restore-workspace! data)
+             (eprintf "cnf-daemon: restored (~a objects, ~a claims)\n"
+                      (length (all-objects)) (length (claims-where))))
+           (init-workspace!))
+       (run-daemon port-num))]
+
+    ;; Bridge mode: stdio proxy to running daemon
+    [(equal? mode "--connect")
+     (run-bridge (string->number arg2))]
+
+    ;; Standard stdio mode
+    [else
+     (init-workspace!)
+     (eprintf "cnf-server: ready\n")
+     (let loop ()
+       (let ([msg (read-message)])
+         (when msg
+           (with-handlers ([exn:fail? (lambda (e)
+                             (eprintf "cnf-server error: ~a\n" (exn-message e)))])
+             (let ([response (make-response msg)])
+               (when response (send-response response))))
+           (loop))))]))

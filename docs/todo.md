@@ -163,6 +163,60 @@ reset + full reparse, destroying accumulated rules. With it, mutations
 flow through the claim graph and matviews auto-update — the scenario
 where CNF should decisively win. Results: `docs/experiments/e9-evolving-codebase/`.
 
+## DONE: Persistence Layer (Checkpoint/Restore + Daemon)
+
+Built cross-session persistence for the claim graph:
+- `checkpoint` tool: serializes all objects, values, claims, supersession
+  history to JSON. `restore` tool: rebuilds full graph + ext table +
+  built-in rules + user-defined rules (from claim-stored source) +
+  matview. Round-trip verified end-to-end.
+- Daemon mode (`--daemon PORT`): TCP server, auto-restores from checkpoint,
+  serialized multi-client access via semaphore.
+- Bridge mode (`--connect PORT`): stdio↔TCP proxy for Claude Code.
+- 24 MCP tools (was 22: added `checkpoint`, `restore`).
+
+## DONE: E10 — The Shared Substrate
+
+Two sessions, same 50-function codebase. Session 1: both agents parse
+and build understanding. Session 2: fresh context, 5 tasks composing
+Session 1's analysis.
+
+CNF: 6 calls, Text: ~5 calls. Text wins 1.2x — the closest yet, and
+call count is now noise. The real finding:
+
+The CNF agent INHERITED 3 rules from Session 1, INSPECTED them via
+list_rules, QUERIED matviews it didn't build, got AUTO-UPDATED results
+through a rename, and COMPOSED new rules on existing derived relations.
+
+The text agent reimplemented everything from scratch. And got several
+answers wrong (22 roots instead of 10, wrong biggest hub) because
+one-off scripts are unvalidated. The matview is a tested artifact.
+
+Call count is the wrong metric. The question is what the agent CAN DO.
+Results: `docs/experiments/e10-shared-substrate/`.
+
+## NEXT: Transactions (Datomic-inspired)
+
+Checkpoint is coarse (whole-graph snapshot). Transactions add:
+1. **Tx entities** — every claim gets a tx ID. "What claims did Agent 1
+   assert?" and "what changed since I was last here?" become queryable.
+2. **Temporal queries** — "as-of tx 12, what were the transitive deps?"
+   The claim graph becomes a timeline, not just a snapshot.
+3. **Batch atomicity** — a rename touching 7 call sites either all
+   succeeds or rolls back. Currently each claim! fires hooks independently.
+
+Enables diff-based reasoning: agents ask "what changed?" not just
+"what is?" This is the next evolution after checkpoint/restore.
+
+## NEXT: Multi-Agent Concurrent Access
+
+Daemon mode supports multiple TCP clients, but the experiment used
+sequential sessions. The next test: two agents building complementary
+understanding simultaneously on the same claim graph.
+
+Agent A defines structural rules. Agent B defines quality rules.
+Agent C composes both. Text can't do this — there's no shared state.
+
 ## LATER: Real Codebase Demo
 
 Run the MCP server against a non-toy Racket project (50+ functions).

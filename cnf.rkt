@@ -18,6 +18,9 @@
          cnf-ctx?
          current-ctx
          make-cnf-ctx
+         make-blank-ctx
+         export-store
+         import-store!
          ctx-ref
          ctx-set!
          superseded?
@@ -206,6 +209,42 @@
 
 (define (reset-store!)
   (current-ctx (make-cnf-ctx)))
+
+;; --- Serialization ---
+
+(define (make-blank-ctx)
+  (cnf-ctx
+   (box 0) (make-hash) (make-hash) (make-hash) (make-hash)
+   (make-hash) (make-hash) (make-hash) (make-hash) (make-hash)
+   (box #f) (make-hash) (make-hash)))
+
+(define (export-store)
+  (define ctx (current-ctx))
+  (hasheq
+   'version 1
+   'next-id (unbox (cnf-ctx-next-id ctx))
+   'objects (hash-keys (cnf-ctx-objects ctx))
+   'values (for/list ([(id lit) (in-hash (cnf-ctx-values ctx))])
+             (list id lit))
+   'claims (for/list ([(cid rec) (in-hash (cnf-ctx-claims ctx))])
+             (list cid (claim-rec-l rec) (claim-rec-p rec) (claim-rec-r rec)))
+   'superseded (hash-keys (cnf-ctx-superseded ctx))))
+
+(define (import-store! data)
+  (define ctx (current-ctx))
+  (for ([id (in-list (hash-ref data 'objects))])
+    (hash-set! (cnf-ctx-objects ctx) id #t))
+  (for ([v (in-list (hash-ref data 'values))])
+    (hash-set! (cnf-ctx-values ctx) (first v) (second v))
+    (hash-set! (cnf-ctx-val-intern ctx) (second v) (first v)))
+  (for ([c (in-list (hash-ref data 'claims))])
+    (define cid (first c))
+    (hash-set! (cnf-ctx-claims ctx) cid (claim-rec (second c) (third c) (fourth c)))
+    (index-claim! cid (second c) (third c) (fourth c)))
+  (for ([s (in-list (hash-ref data 'superseded))])
+    (hash-set! (cnf-ctx-superseded ctx) s #t))
+  (set-box! (cnf-ctx-next-id ctx) (hash-ref data 'next-id))
+  (set-box! (cnf-ctx-symbol-pred-id ctx) "1"))
 
 ;; --- Initialize default context ---
 

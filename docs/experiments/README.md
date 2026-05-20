@@ -16,6 +16,7 @@ a maintained semantic index than against text files.
 | E7 | Interface proof | [results](e7-interface-proof/results.md) | **42 calls → 7.** Schema + batch + symbols = 6x reduction. |
 | E8 | New interface arena | [results](e8-new-interface/results.md) | CNF 32→14 calls. Text also evolved: 12→3. Text wins 4.7x. |
 | E9 | Evolving codebase | [results](e9-evolving-codebase/results.md) | 50 fn, 7 tasks. CNF 10 vs text ~6. Gap narrows to 1.7x. |
+| E10 | Shared substrate | [results](e10-shared-substrate/results.md) | Cross-session persistence. CNF 6 vs text ~5. **Paradigm shift.** |
 
 ## The arc
 
@@ -40,5 +41,12 @@ known upfront.
 E9 scaled to 50 functions and 7 tasks with an agent-initiated rename.
 CNF 10 calls vs text ~6. The 1.7x gap (down from 5.3x in E5) is
 the closest yet. Marginal cost converges to ~1 call/task for both
-approaches — the remaining gap is setup cost. The thesis that remains
-unvalidated: incremental parse after external mutations.
+approaches — the remaining gap is setup cost.
+
+E10 changed the frame entirely. Two sessions, same codebase. The CNF
+agent in Session 2 restored Session 1's claim graph (1 call) and
+inherited 3 rules, queried matviews it didn't build, got auto-updated
+results through a rename, and composed new rules on existing derived
+relations. The text agent reimplemented everything from scratch — and
+got answers wrong. At 1.2x, call count is noise. The differentiation
+is qualitative: what the agent CAN DO, not how many calls it takes.
