@@ -267,11 +267,16 @@ Three new MCP tools: `add_function`, `remove_function`, `modify_function`.
 
 15 lang tests (was 8). All 68 tests passing.
 
-## LATER: Real Codebase Demo
+## DONE: Real Codebase Demo (E12)
 
-Run the MCP server against a non-toy Racket project (50+ functions).
-Show the full workflow: parse, discover, define rules, refactor,
-evolve. Honest timing and capability assessment at real scale.
+100-function financial analytics program, 5 layers. Full workflow:
+parse (37ms) → discover (245 edges) → define rules (trans-dep,
+shared-dep, hub-pair) → refactor (rename, 0.1ms) → evolve via
+incremental parse (add/modify/remove functions, rules survive).
+
+Key numbers: 2399 objects, 1672 claims, 1655 transitive dep pairs,
+firm-pnl depends on 62 of 100 functions. All queries <1ms after
+materialization. Results: `docs/experiments/e12-real-demo/`.
 
 ## LATER: Package for External Use
 

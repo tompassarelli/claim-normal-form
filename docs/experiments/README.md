@@ -18,6 +18,7 @@ a maintained semantic index than against text files.
 | E9 | Evolving codebase | [results](e9-evolving-codebase/results.md) | 50 fn, 7 tasks. CNF 10 vs text ~6. Gap narrows to 1.7x. |
 | E10 | Shared substrate | [results](e10-shared-substrate/results.md) | Cross-session persistence. CNF 6 vs text ~5. **Paradigm shift.** |
 | E11 | Multi-agent | [results](e11-multi-agent/results.md) | Two agents, shared graph. Cross-agent rule composition. **Text can't do this.** |
+| E12 | Real demo | [results](e12-real-demo/results.md) | 100 fns, full workflow: parse→rules→refactor→evolve. Incremental parse works. |
 
 ## The arc
 
