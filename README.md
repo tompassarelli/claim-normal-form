@@ -110,69 +110,6 @@ inflection points:
 
 See the full [experiment arc](docs/experiments/README.md) (E1–E19).
 
-## What's next: parallel feature construction
-
-E1–E19 proved the data model and the coordination thesis. The next
-goal is to prove the architecture where it actually matters:
-
-> **Can multiple agents, sharing a semantic graph, collaboratively
-> build a coherent application — without collapsing into merge hell?**
-
-The target is not a benchmark. It is a real app built by 5 agents
-working on a shared claim graph, where the architecture visibly earns
-its keep. The comparison is not "CNF vs grep." It is:
-
-```
-Agents → shared semantic graph → derived reasoning → coherent program
-```
-
-versus:
-
-```
-Agents → file edits → git merge → pain
-```
-
-**ClaimDesk** — a small CRM/helpdesk/workflow app. The domain is
-chosen because it is structurally rich: entities, state transitions,
-rules, derived views, notifications, permissions, audit trails,
-evolving business logic, cross-cutting consequences. This is exactly
-the environment where semantic coordination matters and text
-coordination breaks.
-
-Five agents, each building a feature that cross-cuts the same entities:
-
-1. **Entities + workflow states** — tickets, contacts, state machine
-2. **Permissions** — who can do what, role-based access
-3. **Audit log** — track every state change with attribution
-4. **Notifications** — trigger alerts on state transitions
-5. **Analytics/reporting** — derived views over ticket lifecycle
-
-Then, mid-build, a requirement change:
-
-> *Archived tickets cannot trigger notifications and are excluded from
-> active reports, but remain visible in audit history.*
-
-This stresses everything: knowledge propagation, consequence
-discovery, contradictory assumptions, shared understanding. In git,
-each agent re-reads files, makes assumptions about shared entities,
-and produces edits that silently conflict. In CNF, the requirement
-becomes a rule that propagates through derived views — every agent
-sees the consequence immediately.
-
-The metrics are not "compile passes." They are:
-
-- Feature completeness
-- Downstream consistency across agents
-- Hidden integration correctness
-- Coordination overhead (rediscovery, contradictory edits)
-- Total wall-clock delivery time
-
-The current Racket daemon (serialized writes, concurrent reads) is
-sufficient. The meaningful parallelism is not lock-free datom writes —
-it is five agents sharing semantic state while building one coherent
-app. BEAM is a natural future runtime for true write concurrency, but
-it is not required for this proof.
-
 ## Architecture
 
 ```

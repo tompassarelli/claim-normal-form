@@ -441,6 +441,59 @@ and 09 are ties — CNF doesn't win on local changes or unique names.
 See `experiments/e17-agent-in-the-loop/` and
 `docs/experiments/e17-agent-in-the-loop/results.md`.
 
+## NOW: F2 — Parallel Feature Construction (ClaimDesk)
+
+E1–E19 proved the data model and coordination thesis. The next goal:
+
+> **Can multiple agents, sharing a semantic graph, collaboratively
+> build a coherent application without collapsing into merge hell?**
+
+**ClaimDesk** — a small CRM/helpdesk/workflow app. The domain is
+structurally rich: entities, state transitions, rules, derived views,
+notifications, permissions, audit trails, evolving business logic,
+cross-cutting consequences. This is exactly the environment where
+semantic coordination matters and text coordination breaks.
+
+Five agents, each building a cross-cutting feature:
+
+1. **Entities + workflow states** — tickets, contacts, state machine
+2. **Permissions** — who can do what, role-based access
+3. **Audit log** — track every state change with attribution
+4. **Notifications** — trigger alerts on state transitions
+5. **Analytics/reporting** — derived views over ticket lifecycle
+
+Mid-build requirement change:
+
+> *Archived tickets cannot trigger notifications and are excluded
+> from active reports, but remain visible in audit history.*
+
+This stresses knowledge propagation, consequence discovery,
+contradictory assumptions, shared understanding. In git, each agent
+re-reads files, makes assumptions about shared entities, and produces
+edits that silently conflict. In CNF, the requirement becomes a rule
+that propagates through derived views — every agent sees the
+consequence immediately.
+
+Metrics: feature completeness, downstream consistency, hidden
+integration correctness, coordination overhead, wall-clock delivery
+time, contradictory edits.
+
+Current Racket daemon (serialized writes, concurrent reads) is
+sufficient. The meaningful parallelism is five agents sharing semantic
+state while building one coherent app. BEAM is a natural future
+runtime for true write concurrency, but is not required for this proof.
+
+## LATER: BEAM Runtime
+
+CNF is the data model. Datalog is the reasoning layer. BEAM is the
+concurrency substrate. Entity/process/message maps onto
+program-entity/claim/update. Each entity serializes its own claim
+updates locally while the whole system remains massively parallel.
+
+Not needed to prove the thesis. Needed when the question shifts from
+"does the claim model work?" to "can N agents use it simultaneously
+at production scale?"
+
 ## LATER: Concurrent Writers (Multi-Writer MVCC)
 
 Current MVCC gives snapshot isolation for reads with serialized writes.
