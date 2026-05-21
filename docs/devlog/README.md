@@ -37,3 +37,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 028 | 2026-05-21 | [F8: CNF-parallel beats git-parallel](028-f8-parallel-race.md) |
 | 029 | 2026-05-21 | [F9: Real agents, real race](029-f9-real-race.md) |
 | 030 | 2026-05-21 | [F10: Live graph race](030-f10-live-race.md) |
+| 031 | 2026-05-21 | [The harvest — capturing what agents actually think](031-harvest-discovery.md) |
