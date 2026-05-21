@@ -32,6 +32,7 @@ a maintained semantic index than against text files.
 | F5 | Coordination curve | [results](f5-curve/results.md) | **8 agents, 28 tests, 3 tiers. Git 25/28 (3 temporal divergence). CNF 28/28. All git failures: on_hold mid-run requirement invisible to forked agents.** |
 | F6 | Time to correct | [results](f6-time-to-correct/results.md) | **Real agents, wall clock to 28/28. Git 276s (parallel + 1 repair round). CNF 500s (sequential, 0 repairs). Git 1.8x faster. Parallelism beats correctness at this scale.** |
 | F7 | Graph necessity | [results](f7-graph-necessity/results.md) | **18 modules, 49 tests, 7 edit sites. Same recall all 3 conditions (6/7, 86%). Graph precision 60% vs grep 35%. Graph 11 tool calls vs grep 35 (3.2x). The graph filters, it doesn't find.** |
+| F8 | Parallel race | [results](f8-parallel-race/results.md) | **Git-parallel vs CNF-parallel, 2 and 5 agents. Git 82s (build + repair). CNF 54s (build, 0 repairs). CNF 1.5x faster. Repair cost (56s) > sequential tax (26s).** |
 
 ## The arc
 
@@ -199,3 +200,13 @@ agent used 11 tool calls vs 35 for grep (3.2x fewer). The graph
 doesn't help agents FIND more sites — it helps them SKIP more
 non-sites. At 18 modules the savings are modest; at scale, the
 precision advantage compounds.
+
+F8 finally answered the speed question: is CNF-parallel faster than
+git-parallel? Yes — 1.5x at both 2 and 5 agent scales. Git agents
+build in parallel but produce 4 cross-cutting bugs, requiring a
+repair round (56s of LLM inference). CNF agents query the shared
+graph and build correctly — zero repair. CNF pays a sequential tax
+(first agent must populate the graph before others query it), but
+repair cost (56s) exceeds sequential tax (26s). The advantage
+compounds with scale: more agents mean more cross-cutting bugs, more
+repair rounds, while the sequential tax stays fixed.

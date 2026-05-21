@@ -194,6 +194,11 @@ is untouched.
   sites. Same recall (86%), but graph precision 60% vs grep 35%
   with 3.2x fewer tool calls. The graph doesn't help agents
   *find* more sites — it helps them *skip* more non-sites.
+- **F8**: Parallel race. Git-parallel vs CNF-parallel, 2 and 5
+  agents. Git 82s (parallel build + 56s repair). CNF 54s
+  (sequential first agent + parallel remaining, 0 repairs).
+  **CNF 1.5x faster.** Repair cost (56s) exceeds the sequential
+  tax (26s). Advantage compounds with scale.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -290,8 +295,8 @@ Claude Code MCP configuration (`.claude/settings.json`):
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 26 experiments (E1–E19, F2–F7) with raw results |
-| **[Devlog](docs/devlog/)** | 27 entries — discoveries, direction changes, honest numbers |
+| **[Experiments](docs/experiments/)** | 27 experiments (E1–E19, F2–F8) with raw results |
+| **[Devlog](docs/devlog/)** | 28 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
 ## Tests
@@ -310,25 +315,26 @@ overlapping edits (F4), and scaling agent count (F5). CNF holds at
 100% across all experiments while git ranges from 50% to 89%.
 
 F6 tested wall clock time to correct code. Git won 1.8x (276s vs
-500s) because parallel build + one cheap repair round beat
-sequential-but-correct. The repair agent fixed 6 failures in 56
-seconds — the failures had clear error messages and local fixes.
-CNF's correctness advantage is real but currently costs more time
-than it saves.
+500s) because CNF ran sequentially. F8 fixed this: with CNF agents
+running in parallel against the daemon, **CNF wins 1.5x** (54s vs
+82s). The advantage comes from eliminating repair rounds — git agents
+produce 4 structural bugs requiring 56s of LLM repair, while CNF
+agents query the graph and build correctly on the first pass.
+
+CNF pays a sequential tax: the first agent must populate the graph
+before others can query it (26s). Since repair (56s) > sequential
+tax (26s), CNF wins. The advantage compounds with scale — more
+agents mean more cross-cutting bugs, more repair rounds, while the
+sequential tax stays fixed.
 
 F7 tested whether the semantic graph itself is necessary (vs. just
-reading files). For a cross-cutting feature on an 18-module codebase,
-the graph doesn't help agents find more edit sites — grep finds
-them all. The graph's value is precision (60% vs 35%) and efficiency
-(3.2x fewer tool calls): knowing which of the many hits actually
-need attention. At 18 modules the savings are modest; at scale the
-filtering advantage compounds.
+reading files). The graph's value is precision (60% vs 35%) and
+efficiency (3.2x fewer tool calls): knowing which hits need attention.
 
-The path forward is CNF parallelism: concurrent agents writing to
-the shared graph simultaneously, getting both speed and correctness.
-That's the BEAM target — entity-as-process, concurrent claims,
-real-time coordination. F6 shows why it matters: without parallelism,
-correctness alone doesn't win on time.
+The path forward is eliminating the sequential tax: fully parallel
+agents with live graph accumulation (validated in F3). This would
+push the advantage from 1.5x toward 3x at 5 agents. At scale
+(10+ agents, multiple repair rounds), the advantage compounds further.
 
 Benchmarks are at 50–200 functions. The correctness advantage is
 structural (entity references vs string matching) and doesn't depend

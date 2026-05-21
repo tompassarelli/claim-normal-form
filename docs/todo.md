@@ -541,6 +541,24 @@ it helps them SKIP more non-sites and work more efficiently.
 See `docs/experiments/f7-graph-necessity/results.md` and
 `docs/devlog/027-f7-agent-experiment.md`.
 
+## DONE: F8 — Parallel Race
+
+Git-parallel vs CNF-parallel at 2 and 5 agent scales. Same ClaimDesk
+app, 18 integration tests.
+
+Results: CNF 1.5x faster (54s vs 82s projected). Git agents produce 4
+cross-cutting bugs requiring a 56s repair round. CNF agents query the
+graph and build correctly — zero repair. CNF pays a 26s sequential tax
+(first agent must populate graph). Since repair (56s) > sequential tax
+(26s), CNF wins.
+
+The advantage compounds with scale: more agents → more bugs → more
+repair rounds, while the sequential tax stays fixed. Eliminating the
+sequential tax (fully parallel live graph) would push toward 3x.
+
+See `docs/experiments/f8-parallel-race/results.md` and
+`docs/devlog/028-f8-parallel-race.md`.
+
 ## LATER: BEAM Runtime
 
 CNF is the data model. Datalog is the reasoning layer. BEAM is the
