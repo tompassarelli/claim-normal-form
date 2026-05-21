@@ -1,219 +1,125 @@
 # Claim Normal Form
 
-Shared semantic substrate for parallel software construction.
+**Programs as executable facts.**
 
-## The thesis
+*spooky action in the substrate*
 
-Software construction doesn't scale with agent count because
-coordination cost dominates:
+CNF stores program structure as claims, derives semantic relations with Datalog, and evaluates graph-native programs directly. Source files are projections; the claim graph is the substrate.
 
-```
-1 agent  → productive
-2 agents → coordination overhead
-5 agents → merge hell
-```
+That one design choice has a consequence the rest of this README is about: when the program *is* a shared graph instead of a pile of text, many agents can build on it at once without colliding.
 
-The cost comes from rediscovery, inconsistent assumptions, hidden
-dependencies, and local-only cognition. **CNF attacks exactly those
-things.** The claim: shared semantic state makes software construction
-composable across many concurrent agents — the coordination curve
-flattens instead of exploding.
+## Why this matters
 
-## The problem: private cognition
+Software construction doesn't scale with agent count. Coordination cost does.
 
-When multiple agents build software in parallel, each agent
-understands the program privately — which functions exist, what calls
-what, what states are possible. That understanding dies when the
-session ends. The next agent starts from scratch. The bugs that
-result are not in any single module. **The failures are in the gaps
-between features** — each module is correct in isolation but
-inconsistent with others.
+- **1 agent** — productive
+- **2 agents** — coordination overhead
+- **5 agents** — merge hell
 
-This is not a testing problem. You cannot test for states you don't
-know exist. An analytics agent can't exclude archived tickets from
-active counts if it doesn't know the archived state exists. A
-permissions agent can't gate the archive action if it never saw the
-workflow module. The test suite passes because each feature is
-self-consistent. The bugs are in the gaps.
+The cost is rediscovery, inconsistent assumptions, hidden dependencies, and cognition that lives and dies inside a single session. Every agent rebuilds a private model of the program; that model evaporates when the session ends; the next agent starts over.
 
-The enemy is not text, not grep, not git. The enemy is **cognition
-trapped inside isolated agent sessions**.
+The bugs that follow live in no single module. They live in the **gaps between features** — each module correct on its own, inconsistent with the others.
 
-**Git agents fork reality. CNF agents accumulate reality.**
+You can't test your way out of this. You can't write a test for a state you don't know exists. An analytics agent won't exclude archived tickets from active counts if it never learned `archived` is a state. A permissions agent won't gate the archive action if it never saw the workflow. Every feature passes its own suite. The system still breaks.
+
+The enemy isn't text, or grep, or git. It's reasoning trapped inside isolated sessions.
+
+> **Git agents fork reality. CNF agents accumulate it.**
 
 ## What CNF does
 
-CNF externalizes reasoning into durable shared structure.
+It externalizes reasoning into durable shared structure.
 
-Instead of treating source code as text, CNF treats it as claims about
-stable identities. A function is an entity with a current name claim,
-not a string. A call site points at the entity, not at matching
-characters. This model persists across sessions, spans agents, and
-updates incrementally as the program changes.
+Source code stops being text and becomes claims about stable identities. A function is an entity carrying a current name claim — not a string. A call site points at the entity, not at matching characters. The model persists across sessions, spans agents, and updates incrementally as the program changes.
 
-The value proposition is the same as a type system: not "catch trivial
-errors" but give the agent a stable model to reason against while the
-program is changing. Types stabilize reasoning during construction.
-CNF stabilizes coordination during collaboration.
+The payoff is the same as a type system's, one level up. Types give you a stable model to reason against while you're *writing* code. CNF gives every agent a stable model to reason against while everyone is *changing* the code at once. Types stabilize construction; CNF stabilizes coordination.
 
-**[How CNF works](docs/overview.md)** — a concrete walkthrough.
+→ [How CNF works — a concrete walkthrough.](docs/overview.md)
+
+## The ontology
+
+```text
+Object = addressable identity
+Entity = object only           (entity!)
+Value  = object + literal      (value!)  — interned, canonical
+Claim  = object + (l p r)      (claim!)  — itself an object
+```
+
+Every fact has the shape `(l p r)`, and every slot is an object. This is not EAV with the columns renamed. In EAV the row is plumbing. In CNF the claim is itself an object — it can be named, superseded, explained, attributed to an agent, assigned to a transaction, or made the subject of further claims. Reification is the default, not a bolt-on.
 
 ## Evidence
 
-### F2: Parallel feature construction
+Each experiment puts git agents and CNF agents on the same task and counts what breaks.
 
-[Five agents build a CRM app](docs/experiments/f2-claimdesk/results.md)
-— workflow, permissions, audit, notifications, analytics. The features
-cross-cut: notifications must suppress for archived tickets, analytics
-must exclude them from active counts, permissions must include the
-archive action.
+### Information gaps (F2, F3)
 
-| | Git | CNF |
-|--|--:|--:|
-| Integration tests | **9/14** | **14/14** |
-| Cross-cutting bugs | **5** | **0** |
+Five agents build a CRM — workflow, permissions, audit, notifications, analytics — with cross-cutting requirements: notifications suppress for archived tickets, analytics excludes them from active counts, permissions covers the archive action.
 
-The git agents are not wrong. They are locally rational — each builds
-a correct module from the information available. The bugs emerge from
-fragmented world models. The CNF notification agent imported
-`TERMINAL_STATUSES` from the workflow module because the claim graph
-told it those entities exist. The git notification agent guessed
-terminal states from domain intuition (`{"closed", "resolved"}`) and
-missed `"archived"` entirely. Not an intelligence difference. Not a
-prompt difference. One system shared semantic structure; the other
-relied on local reconstruction.
+|                    | Git   | CNF   |
+| ------------------ | ----- | ----- |
+| Integration tests  | 9/14  | 14/14 |
+| Cross-cutting bugs | 5     | 0     |
 
-Replicated across two runs with real Claude Code agents (16 agents
-total). The four structural bugs appear in every git run and never
-in any CNF run.
+The git agents aren't dumb — they're *locally rational*, each building a correct module from what it can see. The CNF notification agent imported `TERMINAL_STATUSES` from the workflow module because the claim graph said those entities existed. The git agent guessed terminal states from intuition (`{"closed", "resolved"}`) and never knew `"archived"` was one. Not an intelligence gap, not a prompt gap — one agent had shared structure, the other had local reconstruction. Replicated across two runs (16 agents total); the four structural bugs appear in every git run and no CNF run.
 
-### F3: Live graph accumulation
+**F3** repeats this with a *live* graph — each agent's code is parsed into the graph when it finishes, so the next agent inherits everything (17 → 34 entities across the pipeline). Same result (CNF 13/14, git 7/14). CNF's lone miss is instructive: the permissions agent *found* `archive_ticket` and granted it too broadly — a policy judgment made with full information, not the git failure of not knowing archive exists at all.
 
-[Sequential agents, accumulated graph](docs/experiments/f3-live-graph/results.md).
-Each agent's code is parsed into the live CNF graph after it finishes.
-The next agent inherits all prior entities — the graph grows from 17
-to 34 entities across the pipeline.
+### Overlapping edits (F4)
 
-| | Git | CNF |
-|--|--:|--:|
-| Integration tests | **7/14** | **13/14** |
-| Cross-cutting bugs | **5** | **0** |
+Three agents edit `config.py` independently, and a new status (`on_hold`) lands *after* the first agent forks.
 
-Same five information-gap bugs in git. CNF's single failure: the
-permissions agent *found* `archive_ticket` in the graph but gave
-agents the permission too (test expects admin-only). A policy judgment
-made with full information — categorically different from the git
-failure where the agent doesn't know archive exists at all.
+|                             | Git        | CNF   |
+| --------------------------- | ---------- | ----- |
+| Integration tests           | 18/21      | 21/21 |
+| Config merge conflicts      | 3 versions | 0     |
+| Mid-run requirement handled | no         | yes   |
 
-### F4: Overlapping edits
+Even with a flawless manual merge, the git agents miss `on_hold` entirely — they forked before it existed. CNF agents read the updated graph and absorb it. Merge cost scales quadratically with agent count; sequential accumulation is O(N).
 
-[Agents modify the same files](docs/experiments/f4-overlap/results.md)
-— shared config, shared hooks, mid-run requirement change. Three
-agents independently modify `config.py`. A new status (`on_hold`)
-is added after the first agent finishes.
+### Scaling agent count (F5)
 
-| | Git | CNF |
-|--|--:|--:|
-| Integration tests | **18/21** | **21/21** |
-| Config merge conflicts | **3 versions** | **0** |
-| Mid-run requirement handled | **no** | **yes** |
+Eight agents, three tiers, deepening cross-cut.
 
-Even with a perfect manual merge (no human error in conflict
-resolution), git agents miss the mid-run requirement entirely —
-they forked before `on_hold` existed. CNF agents see the updated
-graph and incorporate it naturally. The merge problem scales
-quadratically with agent count; sequential accumulation is O(N).
+| Tier  | Agents | Git   | CNF   |
+| ----- | ------ | ----- | ----- |
+| A     | 3      | 8/10  | 10/10 |
+| B     | 5      | 7/8   | 8/8   |
+| C     | 8      | 10/10 | 10/10 |
+| Total | 8      | 25/28 | 28/28 |
 
-### F5: Coordination curve
+Every git failure is the same shape — *temporal divergence*. The escalation agent adds `on_hold` to config but can't add it to a workflow it forked away from, so the merged system is internally inconsistent. CNF builds against the current graph and stays coherent.
 
-[Eight agents, three tiers](docs/experiments/f5-curve/results.md).
-Pass rate measured at 3, 5, and 8 agent tiers as cross-cutting
-depth increases.
+### Coordination cost (E19)
 
-| Tier | Agents | Git | CNF |
-|------|--------|-----|-----|
-| A | 3 | **8/10** | **10/10** |
-| B | 5 | **7/8** | **8/8** |
-| C | 8 | **10/10** | **10/10** |
-| **Total** | **8** | **25/28** | **28/28** |
+Five agents on a 45-function codebase, each with a real job: map, rename, cut dead code, add a feature, audit.
 
-All three git failures: temporal divergence. The `on_hold` mid-run
-requirement is invisible to forked agents. The escalation agent
-adds on_hold to config but can't add it to the workflow — the
-merged system is internally inconsistent. CNF agents see the
-updated graph and build correctly.
+|                                 | Git          | CNF    |
+| ------------------------------- | ------------ | ------ |
+| Wasted on rediscovery           | 50 ops (56%) | 0 (0%) |
+| Dead code correctly identified  | 5/7          | 7/7    |
+| Downstream edit silently broken | yes          | no     |
 
-### E19: Coordination cost
+A regex rename hits the function *and* an unrelated parameter that happens to share its name; a later edit then fails silently while the tests stay green. CNF renames the entity — one claim — and the parameter is never touched.
 
-[Five agents on a 45-function codebase](docs/experiments/e19-coordination/results.md).
-Each agent has a real task: map structure, rename, remove dead code,
-add a feature, audit.
+### Speed (F6 → F9)
 
-| | Git | CNF |
-|--|---:|---:|
-| Wasted on rediscovery | **50 ops (56%)** | **0 (0%)** |
-| Dead code correctly identified | 5/7 | 7/7 |
-| Downstream edit silently broken | yes | no |
+The honest part. CNF wins on correctness everywhere; speed depended on whether it could run in parallel.
 
-Regex rename damages downstream work: renames the function *and* an
-unrelated parameter sharing the name. A later edit fails silently.
-Tests pass. CNF renames the entity — one claim. The parameter entity
-is untouched.
+- **F6** — Git won 1.8× (276s vs 500s) — but only because CNF ran sequentially against git's parallel build-plus-repair.
+- **F8** — With all agents parallel, CNF flips it: 28s vs 82s (3×). The entire delta is git's 56s repair pass.
+- **F9** — Real Claude Sonnet agents, wall-clock: CNF 34s vs git 68s (2×), same four structural bugs every run. The F2/F8 prediction holds under real inference.
 
-### The experiment arc
+### Is the graph even necessary? (F7, F10)
 
-28 experiments tracked the evolution. Key inflection points:
+**F7** pits graph-first against grep and plain file-reading on 7 edit sites across 18 modules. Recall ties at 86% — but graph precision is 60% vs grep's 35%, at 3.2× fewer tool calls. The graph doesn't find *more* sites; it lets agents skip the non-sites.
 
-- **E15–E16**: CNF answers structural queries correctly (entity
-  resolution, transitive closure, shadowed names). Text search gets
-  them wrong. Not faster — *correct*.
-- **E17–E18**: Both agents pass all tests. Hidden contract tests:
-  CNF 30/30, text 26/30. Rope (real semantic tool) ties CNF on
-  single-language rename but provides no persistent state, no rule
-  engine, no cross-session memory.
-- **E19**: Shared model eliminates 56% rediscovery *and* prevents
-  cascading correctness failures.
-- **F2**: Construction, not maintenance. The cross-cutting bugs
-  are structural — they follow from the information gap, not from
-  agent randomness.
-- **F3**: Live graph accumulation. Same correctness result, but the
-  context arrives via live MCP queries, not static prompt injection.
-  The infrastructure for scaling agent count.
-- **F4**: Overlapping edits. Agents modify the same files. Git
-  produces merge conflicts and misses mid-run changes. CNF
-  accumulates cleanly.
-- **F5**: Coordination curve. Eight agents, three tiers. Git 89%,
-  CNF 100%. All failures are temporal divergence — the same
-  structural cause, now at scale.
-- **F6**: Time to correct. Real agents, wall clock to 28/28. Git
-  276s (parallel + repair), CNF 500s (sequential, no repair).
-  **Git 1.8x faster.** Parallelism beats correctness when
-  repair is cheap. CNF needs its own parallelism.
-- **F7**: Graph necessity. 18 modules, 49 tests, 7 edit sites.
-  Three agents (grep, file-reader, graph-first) identify edit
-  sites. Same recall (86%), but graph precision 60% vs grep 35%
-  with 3.2x fewer tool calls. The graph doesn't help agents
-  *find* more sites — it helps them *skip* more non-sites.
-- **F8**: Parallel race. Git-parallel vs CNF-parallel, 2 and 5
-  agents. Git 82s (parallel build + 56s repair). CNF 28s
-  (all parallel, live graph accumulation, 0 repairs).
-  **CNF 3x faster.** Repair cost (56s) is the entire delta.
-- **F9**: Real parallel race. Six real Claude Sonnet agents, wall
-  clock measured. Git 68s (build + 48s repair). CNF 34s (build,
-  0 repairs). **CNF 2x faster.** Same 4 structural bugs as F2/F8,
-  every run. The prediction holds with real LLM inference.
-- **F10**: Live graph race. Real agents, live CNF daemon, graph-derived
-  context from live queries (1685 objects, 1130 claims, 6 simultaneous
-  MCP bridges). **Same 4 info-gap bugs eliminated.** Git 16.5/22
-  first-pass, CNF 20/22. Direct agent queries work technically but
-  agents can't navigate Datalog schema — coordinator-mediated context
-  is the practical path.
+**F10** runs a live CNF daemon serving six agents via MCP bridges (1685 objects, 1130 claims, 6 simultaneous bridges). Same info-gap bugs eliminated, now from live queries: CNF 20/22 vs git 16.5/22 first-pass. Caveat — agents can't navigate raw Datalog, so coordinator-mediated context is the practical path, and higher-level query tools are the next interface step.
 
-See the full [experiment arc](docs/experiments/README.md).
+→ [See the full experiment arc — E1–E19, F2–F10 — with raw results.](docs/experiments/README.md)
 
 ## Architecture
 
-```
+```text
 cnf-lib/
   main.rkt             Public API — (require cnf) re-exports core modules
   server.rkt           29 MCP tools over JSON-RPC 2.0 — the agent control surface
@@ -237,36 +143,18 @@ cnf/
   info.rkt             Meta package — (define implies '("cnf-lib"))
 ```
 
-Three language bridges prove the pattern is language-agnostic. Adding a
-new language means writing a frontend that maps its AST into entities
-and claims. Dependency queries, rename propagation, history, MCP tools,
-and materialized views are shared infrastructure.
-
-## The ontology
-
-```
-Object = addressable identity
-Entity = object only           (entity!)
-Value  = object + literal      (value!)  — interned, canonical
-Claim  = object + (l p r)      (claim!)  — itself an object
-```
-
-The fact shape is `(l p r)` — each slot is an object. This is not EAV
-with different names. In EAV, the row is an implementation detail. In
-CNF, the claim itself is an object: it can be named, superseded,
-explained, attributed to an agent, assigned a transaction, or used as
-the subject of later claims. Reification is the default, not a bolt-on.
+Three bridges prove the pattern is language-agnostic. A new language is just a frontend that maps an AST into entities and claims — dependency queries, rename propagation, history, MCP tools, and materialized views are all shared infrastructure underneath.
 
 ## Quick start
 
 ```bash
-# Prerequisites: Racket 8.x, Python 3.x (for Python bridge)
+# Prerequisites: Racket 8.x, Python 3.x (for the Python bridge)
 
 # Install
 git clone https://github.com/tom/cnf-racket && cd cnf-racket
 raco pkg install cnf/            # meta package — installs cnf-lib + deps
 
-# Beagle bridge requires beagle-lib (optional):
+# Beagle bridge (optional):
 #   git clone https://github.com/tom/beagle && raco pkg install beagle/beagle-lib/
 
 # Verify
@@ -278,10 +166,10 @@ racket -e '(require cnf) (displayln (make-cnf-ctx))'
 # MCP server
 racket cnf-lib/server.rkt               # stdio mode
 racket cnf-lib/server.rkt --daemon 7888 # daemon mode (multi-client, MVCC)
-racket cnf-lib/server.rkt --connect 7888 # bridge to running daemon
+racket cnf-lib/server.rkt --connect 7888 # bridge to a running daemon
 ```
 
-Claude Code MCP configuration (`.claude/settings.json`):
+Claude Code MCP config (`.claude/settings.json`):
 
 ```json
 {
@@ -297,56 +185,27 @@ Claude Code MCP configuration (`.claude/settings.json`):
 ## Documentation
 
 | Doc | Contents |
-|-----|----------|
-| **[How CNF works](docs/overview.md)** | Concrete walkthrough — function as claims, rename, deps, agents |
-| **[API reference](docs/api.md)** | Kernel, Datalog, eval, schema, graph, lang layer APIs |
-| **[MCP server](docs/mcp.md)** | 29 tools, MCP Resources, workflows, daemon mode |
-| **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
-| **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
-| **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 29 experiments (E1–E19, F2–F10) with raw results |
-| **[Devlog](docs/devlog/)** | 28 entries — discoveries, direction changes, honest numbers |
-| **[Roadmap](docs/todo.md)** | What's done, what's next |
+| --- | -------- |
+| [How CNF works](docs/overview.md) | Concrete walkthrough — function as claims, rename, deps, agents |
+| [API reference](docs/api.md) | Kernel, Datalog, eval, schema, graph, lang layer APIs |
+| [MCP server](docs/mcp.md) | 29 tools, MCP Resources, workflows, daemon mode |
+| [Language bridges](docs/bridges.md) | Racket, Python, and Beagle bridges; adding new languages |
+| [Performance](docs/performance.md) | Benchmarks, honest limitations |
+| [Specification](specification.md) | Full formal spec |
+| [Experiments](docs/experiments/README.md) | 29 experiments (E1–E19, F2–F10) with raw results |
+| [Devlog](docs/devlog/README.md) | 28 entries — discoveries, direction changes, honest numbers |
+| [Roadmap](docs/todo.md) | What's done, what's next |
 
 ## Tests
 
-379 tests across 11 files:
-
 ```bash
-raco test cnf-test/tests/     # run all
+raco test cnf-test/tests/     # 379 tests across 11 files
 ```
 
-## Limitations and what's next
+## Limitations
 
-F2-F5 establish that shared semantic state eliminates coordination
-bugs during parallel construction — across information gaps (F2/F3),
-overlapping edits (F4), and scaling agent count (F5). CNF holds at
-100% across all experiments while git ranges from 50% to 89%.
+The correctness story is solid; the scale story isn't proven yet.
 
-F6 tested wall clock time to correct code. Git won 1.8x (276s vs
-500s) because CNF ran sequentially. F8 fixed this with projected
-timing: all agents in parallel, **CNF 3x faster** (28s vs 82s).
-F9 confirmed with real Claude Sonnet agents: **CNF 2x faster**
-(34s vs 68s mean across two runs). Same 4 structural bugs every
-run — the prediction from F2/F8 holds with real LLM inference.
+CNF holds at 100% across F2–F5 while git ranges 50–89% — and that advantage is *structural* (entity references vs string matching), so it shouldn't erode with size. The advantage also compounds: more agents mean more bugs and more repair rounds for git, while CNF's graph stays roughly constant (~2s). Projected ~5× at 10 agents, ~7× at 20.
 
-F10 closed the infrastructure loop: a live CNF daemon serving
-graph-derived context to six agents via MCP bridges. Same
-correctness result (20/22 CNF vs 16.5/22 git first-pass), now
-from live queries against a 1685-object graph. Direct agent graph
-queries work technically but agents can't navigate the Datalog
-schema — higher-level query tools are the next interface step.
-
-F7 tested whether the semantic graph itself is necessary (vs. just
-reading files). The graph's value is precision (60% vs 35%) and
-efficiency (3.2x fewer tool calls): knowing which hits need attention.
-
-The advantage compounds with scale: more agents mean more bugs, more
-repair rounds, while CNF's graph infrastructure stays constant (~2s).
-At 10 agents (2 repair rounds), projected ~5x. At 20, ~7x.
-
-Benchmarks are at 50–200 functions. The correctness advantage is
-structural (entity references vs string matching) and doesn't depend
-on scale, but performance at large scale is unproven. The repair
-loop's effectiveness may degrade at larger scale — more agents, more
-files, harder cross-cutting failures, repair rounds that compound.
+But benchmarks top out at 50–200 functions. Performance at real scale is unmeasured, and the repair loop CNF beats may itself behave differently when there are more agents, more files, harder cross-cutting failures, and repair rounds that compound. Earlier experiments (E15–E18) showed the structural-query and hidden-contract-test wins that motivate all of this — CNF 30/30 vs text 26/30 on hidden contracts — but the headline numbers above are the load-bearing ones.
