@@ -9,7 +9,7 @@
          current-name render-ref
          change-operand!
          affected-by
-         invalidate-eval-events!
+         invalidate-reductions!
          recompute-affected!)
 
 ;; --- Predicate accessors (stored in context extensions) ---
@@ -23,12 +23,22 @@
   (ctx-set! 'name-pred (named! "name"))
   (ctx-set! 'supersedes-pred (named! "supersedes"))
   (set-supersedes-pred! (supersedes-pred))
+  ;; Dependency rules: expr depends on its sub-expressions
   (define-rule (expr-depends-on (? expr) (? dep))
     (current-triple (? expr) (left-pred) (? dep))
-    (current-triple (? dep) (op-pred) (? _op1)))
+    (current-triple (? dep) (kind-pred) (? _k)))
   (define-rule (expr-depends-on (? expr) (? dep))
     (current-triple (? expr) (right-pred) (? dep))
-    (current-triple (? dep) (op-pred) (? _op2)))
+    (current-triple (? dep) (kind-pred) (? _k)))
+  (define-rule (expr-depends-on (? expr) (? dep))
+    (current-triple (? expr) (fn-pred) (? dep))
+    (current-triple (? dep) (kind-pred) (? _k)))
+  (define-rule (expr-depends-on (? expr) (? dep))
+    (current-triple (? expr) (arg-pred) (? dep))
+    (current-triple (? dep) (kind-pred) (? _k)))
+  (define-rule (expr-depends-on (? expr) (? dep))
+    (current-triple (? expr) (body-pred) (? dep))
+    (current-triple (? dep) (kind-pred) (? _k)))
   (define-rule (affected (? x) (? changed))
     (expr-depends-on (? x) (? changed)))
   (define-rule (affected (? x) (? changed))
@@ -88,20 +98,20 @@
 
 ;; --- Incremental recompute ---
 
-(define (invalidate-eval-events! expr-id)
-  (define ev-claims
-    (current-claims-where #:p (evaluated-pred) #:r expr-id))
-  (for ([c (in-list ev-claims)])
-    (define ev-entity (list-ref c 2))
+(define (invalidate-reductions! expr-id)
+  (define red-claims
+    (current-claims-where #:p (reduced-from-pred) #:r expr-id))
+  (for ([c (in-list red-claims)])
+    (define red-entity (list-ref c 2))
     (invalidate! (first c))
-    (for ([rc (in-list (current-claims-where #:l ev-entity #:p (result-pred)))])
+    (for ([rc (in-list (current-claims-where #:l red-entity #:p (reduced-to-pred)))])
       (invalidate! (first rc)))
-    (for ([ec (in-list (current-claims-where #:l ev-entity #:p (under-env-pred)))])
-      (invalidate! (first ec)))))
+    (for ([rc (in-list (current-claims-where #:l red-entity #:p (reduced-rule-pred)))])
+      (invalidate! (first rc)))))
 
 (define (recompute-affected! env changed-expr-id)
   (define affected-ids (affected-by changed-expr-id))
   (for ([expr-id (in-list affected-ids)])
-    (invalidate-eval-events! expr-id))
-  (define new-evs (run! env #:only affected-ids))
-  (values affected-ids new-evs))
+    (invalidate-reductions! expr-id))
+  (for/list ([expr-id (in-list affected-ids)])
+    (graph-eval expr-id env)))

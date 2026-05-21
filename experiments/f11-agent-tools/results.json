@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-05-21 19:18:47",
+  "experiment": "F11",
+  "agents": 6,
+  "conditions": [
+    "datalog"
+  ],
+  "datalog": {
+    "build_time": 44.23259988200152,
+    "repair_time": 99.43811149598332,
+    "total_time": 143.67071137798484,
+    "pass_before": 20,
+    "fail_before": 2,
+    "pass_after": 22,
+    "fail_after": 0,
+    "info_gap_bugs": 0,
+    "other_bugs": 2,
+    "failures_before": [
+      "FAIL: test_09_create_triggers_audit: No audit entry for create",
+      "FAIL: test_11_archive_permission: Admin should have archive permission"
+    ],
+    "failures_after": [],
+    "agent_times": {
+      "audit": 32.27110521297436,
+      "comments": 34.31376623699907,
+      "permissions": 39.83158701797947,
+      "escalation": 41.047942467965186,
+      "notifications": 44.00993011397077,
+      "analytics": 44.22862756100949
+    }
+  }
+}

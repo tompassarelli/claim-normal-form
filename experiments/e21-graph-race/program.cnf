@@ -1,0 +1,14 @@
+(defn base-rate [hours rate]
+  (* hours rate))
+
+(defn overtime [hours rate]
+  (* (base-rate hours rate) 2))
+
+(defn total-pay [base extra]
+  (+ base extra))
+
+(defn split-pay [total parts]
+  (/ total parts))
+
+(defn after-split [total parts deduction]
+  (- (split-pay total parts) deduction))

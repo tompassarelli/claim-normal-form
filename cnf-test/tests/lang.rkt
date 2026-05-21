@@ -3,7 +3,16 @@
 (require rackunit
          cnf/private/kernel
          cnf/private/datalog
-         cnf/private/eval
+         (only-in cnf/private/eval setup-eval! op-pred
+                                  graph-eval empty-env extend-env
+                                  node-value kind-pred
+                                  node-kind node-ref
+                                  run-root-pred run-status-pred
+                                  run-result-pred run-reason-pred
+                                  run-error-node-pred
+                                  fuel-limit-pred fuel-used-pred
+                                  exn:fuel exn:fuel-node-id
+                                  var! app! lit!)
          cnf/private/graph
          cnf/private/lang)
 
@@ -101,10 +110,7 @@
   (define fns (parse-program! "(defn calc [a b]\n  (* a b))"))
   (define fn-id (first fns))
   (define body-id (get-body fn-id))
-  (define builtins (ctx-ref 'builtins))
-  (define mul-op (hash-ref builtins '*))
-  (define add-op (hash-ref builtins '+))
-  (change-operand! body-id (op-pred) mul-op add-op)
+  (change-operand! body-id (op-pred) (value! "*") (value! "+"))
   (define rendered (render-fn fn-id))
   (check-true (string-contains? rendered "(+ a b)"))
   (check-false (string-contains? rendered "(* a b)"))
@@ -216,6 +222,135 @@
   (define rendered (render-fn new-fn))
   (check-true (string-contains? rendered "(base x y)"))
   (displayln "PASS 15 — add-function! resolves calls to existing functions"))
+
+;; 16. Parsed function body evaluable via graph-eval
+(fresh!)
+(let ()
+  (define fns (parse-program! "(defn multiply [x y]\n  (* x y))"))
+  (define fn-id (first fns))
+  (define params (get-ordered-params fn-id))
+  (define body-id (get-body fn-id))
+  (define env (extend-env
+               (extend-env (empty-env)
+                           (first params) (lit! 3))
+               (second params) (lit! 4)))
+  (define result (graph-eval body-id env))
+  (check-equal? (node-value result) 12)
+  (displayln "PASS 16 — parsed function body evaluable via graph-eval"))
+
+;; 17. Multi-function: parse, link, evaluate across function boundary
+(fresh!)
+(let ()
+  (define source
+    "(defn helper [a b]\n  (+ a b))\n\n(defn caller [x y]\n  (+ (helper x y) 100))")
+  (define fns (parse-program! source))
+  (define helper-id (first fns))
+  (define caller-id (second fns))
+  (define ep (ctx-ref 'eval/param))
+  (define eb (ctx-ref 'eval/body))
+  (define (make-curried params body)
+    (foldr (lambda (p inner)
+             (define lam (entity!))
+             (claim! lam (kind-pred) (value! "lambda"))
+             (claim! lam ep p)
+             (claim! lam eb inner)
+             lam)
+           body params))
+  (define helper-lam
+    (make-curried (get-ordered-params helper-id) (get-body helper-id)))
+  (define caller-lam
+    (make-curried (get-ordered-params caller-id) (get-body caller-id)))
+  (define base-env (empty-env))
+  (define env1 (extend-env base-env helper-id (lit! 'placeholder)))
+  (define env2 (extend-env env1 caller-id (lit! 'placeholder)))
+  (define helper-closure (graph-eval helper-lam env2))
+  (define caller-closure (graph-eval caller-lam env2))
+  (claim! env1 (ctx-ref 'eval/env-value) helper-closure)
+  (claim! env2 (ctx-ref 'eval/env-value) caller-closure)
+  (define call-expr (app! (app! (var! caller-id) (lit! 3)) (lit! 4)))
+  (define result (graph-eval call-expr env2))
+  (check-equal? (node-value result) 107)
+  (displayln "PASS 17 — multi-function: parsed, linked, evaluated via graph-eval"))
+
+;; 18. eval-function! — single function, success
+(fresh!)
+(let ()
+  (define fns (parse-program! "(defn multiply [x y]\n  (* x y))"))
+  (define fn-id (first fns))
+  (define run-id (eval-function! fn-id '(3 4)))
+  (check-equal? (resolve-value (node-ref run-id (run-status-pred))) "complete")
+  (define result-node (node-ref run-id (run-result-pred)))
+  (check-equal? (node-value result-node) 12)
+  (check-true (> (resolve-value (node-ref run-id (fuel-used-pred))) 0))
+  (check-equal? (resolve-value (node-ref run-id (fuel-limit-pred))) 10000)
+  (check-equal? (node-ref run-id (run-root-pred)) fn-id)
+  (displayln "PASS 18 — eval-function! single function success, run is queryable"))
+
+;; 19. eval-function! — cross-function call
+(fresh!)
+(let ()
+  (define source
+    "(defn helper [a b]\n  (+ a b))\n\n(defn caller [x y]\n  (+ (helper x y) 100))")
+  (define fns (parse-program! source))
+  (define caller-id (second fns))
+  (define run-id (eval-function! caller-id '(3 4)))
+  (check-equal? (resolve-value (node-ref run-id (run-status-pred))) "complete")
+  (define result-node (node-ref run-id (run-result-pred)))
+  (check-equal? (node-value result-node) 107)
+  (displayln "PASS 19 — eval-function! cross-function call, caller(3,4) = 107"))
+
+;; 20. eval-function! — fuel exhaustion becomes queryable claim
+(fresh!)
+(let ()
+  (define source
+    "(defn self [x y]\n  (self x y))")
+  (define fns (parse-program! source))
+  (define fn-id (first fns))
+  (define run-id (eval-function! fn-id '(1 2) #:fuel 50))
+  (check-equal? (resolve-value (node-ref run-id (run-status-pred))) "incomplete")
+  (check-equal? (resolve-value (node-ref run-id (run-reason-pred))) "fuel-exhausted")
+  (check-not-false (node-ref run-id (run-error-node-pred)))
+  (check-equal? (resolve-value (node-ref run-id (fuel-used-pred))) 50)
+  (displayln "PASS 20 — eval-function! fuel exhaustion is queryable graph data"))
+
+;; 21. eval-function! — error becomes queryable claim
+(fresh!)
+(let ()
+  (define fns (parse-program! "(defn broken [x y]\n  (+ x y))"))
+  (define fn-id (first fns))
+  ;; Too many args: 2-arg fn applied to 3 values tries to apply a literal
+  (define run-id (eval-function! fn-id '(1 2 3)))
+  (check-equal? (resolve-value (node-ref run-id (run-status-pred))) "error")
+  (check-not-false (node-ref run-id (run-reason-pred)))
+  (displayln "PASS 21 — eval-function! error is queryable graph data"))
+
+;; 22. eval-function! after rename — still evaluates correctly
+(fresh!)
+(let ()
+  (define source
+    "(defn compute [a b]\n  (* a b))\n\n(defn wrapper [x y]\n  (+ (compute x y) 10))")
+  (define fns (parse-program! source))
+  (define compute-id (first fns))
+  (define wrapper-id (second fns))
+  (rename! compute-id "calculate")
+  (define run-id (eval-function! wrapper-id '(5 6)))
+  (check-equal? (resolve-value (node-ref run-id (run-status-pred))) "complete")
+  (check-equal? (node-value (node-ref run-id (run-result-pred))) 40)
+  (displayln "PASS 22 — eval-function! works after rename"))
+
+;; 23. eval-function! — multiple runs are independent queryable entities
+(fresh!)
+(let ()
+  (define fns (parse-program! "(defn add [x y]\n  (+ x y))"))
+  (define fn-id (first fns))
+  (define run1 (eval-function! fn-id '(1 2)))
+  (define run2 (eval-function! fn-id '(10 20)))
+  (check-not-equal? run1 run2)
+  (check-equal? (node-value (node-ref run1 (run-result-pred))) 3)
+  (check-equal? (node-value (node-ref run2 (run-result-pred))) 30)
+  (check-equal? (node-kind run1) "eval-run")
+  (check-equal? (node-kind run2) "eval-run")
+  (displayln "PASS 23 — multiple eval runs are independent queryable entities"))
 
 (displayln "")
 (displayln "All lang tests passed.")

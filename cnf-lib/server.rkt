@@ -12,6 +12,10 @@
          "private/eval.rkt"
          "private/graph.rkt"
          "private/schema.rkt"
+         (rename-in "private/lang.rkt" [body-pred cnf-body-pred]
+                    [add-function! cnf-add-function!]
+                    [modify-function! cnf-modify-function!]
+                    [remove-function! cnf-remove-function!])
          "private/python.rkt")
 
 ;; Beagle bridge is optional — works without beagle-lib installed
@@ -60,6 +64,7 @@
   (setup-graph!)
   (setup-schema!)
   (setup-rule-predicates!)
+  (setup-lang!)
   (when beagle-available? (setup-beagle-lang!))
   (setup-python-lang!)
   (materialize!))
@@ -70,18 +75,6 @@
 ;; --- Restore from checkpoint ---
 
 (define (register-builtin-rules!)
-  ;; Eval-layer rules (operand resolution, readiness, dependency tracking)
-  (define-rule (operand-val (? operand) (? operand))
-    (value (? operand) (? _lit)))
-  (define-rule (operand-val (? operand) (? result-val))
-    (current-triple (? ev) (evaluated-pred) (? operand))
-    (current-triple (? ev) (result-pred) (? result-val)))
-  (define-rule (ready (? expr) (? op) (? lval) (? rval))
-    (current-triple (? expr) (op-pred) (? op))
-    (current-triple (? expr) (left-pred) (? left))
-    (current-triple (? expr) (right-pred) (? right))
-    (operand-val (? left) (? lval))
-    (operand-val (? right) (? rval)))
   (define-rule (expr-depends-on (? expr) (? dep))
     (current-triple (? expr) (left-pred) (? dep))
     (current-triple (? dep) (op-pred) (? _op1)))
@@ -93,8 +86,6 @@
   (define-rule (affected (? x) (? changed))
     (expr-depends-on (? x) (? y))
     (affected (? y) (? changed)))
-  ;; Beagle-lang rules: contains-call and fn-depends-on are registered
-  ;; by setup-beagle-lang! using has-child traversal
   (void))
 
 (define (restore-workspace! data)
@@ -105,15 +96,22 @@
     (define id (resolve-symbol name))
     (when id (ctx-set! key id)))
 
-  (find-pred "op" 'op-pred)
-  (find-pred "left" 'left-pred)
-  (find-pred "right" 'right-pred)
-  (find-pred "evaluated" 'evaluated-pred)
-  (find-pred "result" 'result-pred)
-  (find-pred "under-env" 'under-env-pred)
+  ;; Graph/kernel predicates
   (find-pred "name" 'name-pred)
   (find-pred "supersedes" 'supersedes-pred)
   (set-supersedes-pred! (ctx-ref 'supersedes-pred))
+
+  ;; Eval-layer predicates (eval/X keys)
+  (for ([p '(kind param body binding name fn arg op left right
+             cond then else let-binding let-val let-body
+             reduced-from reduced-to reduced-rule
+             env-parent env-binding env-value
+             closure-param closure-body closure-env
+             fuel-limit fuel-used
+             run-root run-status run-result run-reason run-error-node)])
+    (find-pred (symbol->string p) (string->symbol (format "eval/~a" p))))
+
+  ;; Lang-layer predicates
   (find-pred "has-param" 'has-param)
   (find-pred "position" 'position-pred)
   (find-pred "body" 'body-pred)
@@ -135,13 +133,14 @@
   (find-pred "rule-head-rel" 'rule-head-rel-pred-id)
   (find-pred "rule-source" 'rule-source-pred-id)
 
-  (ctx-set! 'primitives (make-hash))
+  (ctx-set! 'eval/primitives (make-hash))
   (ctx-set! 'builtins (make-hash))
   (for ([pair (list (cons "+" +) (cons "-" -) (cons "*" *) (cons "/" /))])
-    (define id (resolve-symbol (car pair)))
+    (define name-str (car pair))
+    (define id (resolve-symbol name-str))
+    (register-primitive! name-str (cdr pair))
     (when id
-      (register-primitive! id (cdr pair))
-      (hash-set! (ctx-ref 'builtins) (string->symbol (car pair)) id)))
+      (hash-set! (ctx-ref 'builtins) (string->symbol name-str) name-str)))
 
   (ctx-set! 'rules '())
   (register-builtin-rules!)
@@ -581,7 +580,28 @@
                       'description "Name of the function to modify")
         'source (hasheq 'type "string"
                         'description "New beagle function definition, e.g. (defn foo [(x : Int) (y : Int)] : Int (* x y))"))
-      'required '("name" "source")))))
+      'required '("name" "source")))
+
+   ;; Evaluate
+   (hasheq
+    'name "evaluate"
+    'description (string-append
+      "Evaluate a function from the claim graph. Builds the runtime environment "
+      "(curried lambdas, mutual function bindings), evaluates the function call, "
+      "and records the outcome as queryable claims on an eval-run entity. "
+      "Returns the run ID for querying result, provenance, fuel use, and errors. "
+      "Works with functions parsed via parse_program with language 'cnf'.")
+    'inputSchema (hasheq
+      'type "object"
+      'properties (hasheq
+        'function (hasheq 'type "string"
+                          'description "Function name or entity ID to evaluate")
+        'args (hasheq 'type "array"
+                      'items (hasheq)
+                      'description "Argument values (numbers, strings, booleans)")
+        'fuel (hasheq 'type "integer"
+                      'description "Maximum evaluation steps (default: 10000)"))
+      'required '("function" "args")))))
 
 ;; --- Resource generation ---
 
@@ -901,21 +921,31 @@
                    (regexp-match? #rx"^\\s*from " source))
                "python" "beagle")))
      (define fns
-       (if (equal? lang "python")
-           (parse-python-program! source)
-           (parse-beagle-program! source)))
-     (define fk-pred
-       (if (equal? lang "python") (py-form-kind-pred) (form-kind-pred)))
+       (cond
+         [(equal? lang "cnf") (parse-program! source)]
+         [(equal? lang "python") (parse-python-program! source)]
+         [else (parse-beagle-program! source)]))
      (define form-lines
-       (for/list ([f (in-list fns)])
-         (define kind-cs (current-claims-where #:l f #:p fk-pred))
-         (define kind (and (not (null? kind-cs))
-                          (resolve-value (list-ref (first kind-cs) 3))))
-         (format "  ~a: ~a (~a)" f (render-ref f) (or kind "?"))))
+       (cond
+         [(equal? lang "cnf")
+          (for/list ([f (in-list fns)])
+            (format "  ~a: ~a (defn)" f (render-ref f)))]
+         [else
+          (define fk-pred
+            (if (equal? lang "python") (py-form-kind-pred) (form-kind-pred)))
+          (for/list ([f (in-list fns)])
+            (define kind-cs (current-claims-where #:l f #:p fk-pred))
+            (define kind (and (not (null? kind-cs))
+                             (resolve-value (list-ref (first kind-cs) 3))))
+            (format "  ~a: ~a (~a)" f (render-ref f) (or kind "?")))]))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
      (define dep-relation
        (if (equal? lang "python") "py-fn-depends-on" "fn-depends-on"))
+     (define eval-note
+       (if (equal? lang "cnf")
+           (list "" "Functions are evaluable. Use the evaluate tool to run them.")
+           '()))
      (string-join
       (append
        (list (format "Parsed ~a form(s) [~a] (~a objects, ~a claims):"
@@ -923,8 +953,9 @@
        form-lines
        (list ""
              (format "Dependency relation: ~a(caller, callee)" dep-relation)
-             "Use query tool with this relation to discover cross-function dependencies."
-             ""
+             "Use query tool with this relation to discover cross-function dependencies.")
+       eval-note
+       (list ""
              "Resources available (inject into context):"
              "  cnf://summary — codebase overview + deps + recent changes"
              "  cnf://dependencies — full dependency graph"
@@ -935,15 +966,21 @@
     [("render")
      (define ids (hash-ref arguments 'ids))
      (define first-id (first ids))
-     (define fk-claims (current-claims-where #:l first-id #:p (py-form-kind-pred)))
-     (define is-python (not (null? fk-claims)))
-     (if is-python
-         (if (= (length ids) 1)
-             (render-python-fn first-id)
-             (render-python-program ids))
-         (if (= (length ids) 1)
-             (render-beagle-fn first-id)
-             (render-beagle-program ids)))]
+     (define py-claims (current-claims-where #:l first-id #:p (py-form-kind-pred)))
+     (define cnf-body (current-claims-where #:l first-id #:p (cnf-body-pred)))
+     (cond
+       [(not (null? py-claims))
+        (if (= (length ids) 1)
+            (render-python-fn first-id)
+            (render-python-program ids))]
+       [(not (null? cnf-body))
+        (if (= (length ids) 1)
+            (render-fn first-id)
+            (render-program ids))]
+       [else
+        (if (= (length ids) 1)
+            (render-beagle-fn first-id)
+            (render-beagle-program ids))])]
 
     [("rename")
      (define id (hash-ref arguments 'id))
@@ -1046,10 +1083,14 @@
     [("add_function")
      (define source (hash-ref arguments 'source))
      (define lang (hash-ref arguments 'language #f))
+     (define is-cnf (or (equal? lang "cnf")
+                        (and (not lang) (regexp-match? #rx"^\\s*\\(defn " source))))
      (define is-python (or (equal? lang "python")
                           (and (not lang) (regexp-match? #rx"^\\s*def " source))))
      (define fn-id
-       (if is-python (add-python-function! source) (add-beagle-function! source)))
+       (cond [is-cnf (cnf-add-function! source)]
+             [is-python (add-python-function! source)]
+             [else (add-beagle-function! source)]))
      (define fn-name (render-ref fn-id))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
@@ -1064,6 +1105,8 @@
            [(not resolved) (error 'remove_function "unknown function: ~a" fn-name)]
            [(not (null? (current-claims-where #:l resolved #:p (py-form-kind-pred))))
             (remove-python-function! fn-name)]
+           [(not (null? (current-claims-where #:l resolved #:p (cnf-body-pred))))
+            (cnf-remove-function! fn-name)]
            [beagle-available?
             (remove-beagle-function! fn-name)]
            [else (error 'remove_function "cannot determine language for: ~a" fn-name)])))
@@ -1076,12 +1119,14 @@
      (define fn-name (hash-ref arguments 'name))
      (define source (hash-ref arguments 'source))
      (define lang (hash-ref arguments 'language #f))
+     (define is-cnf (or (equal? lang "cnf")
+                        (and (not lang) (regexp-match? #rx"^\\s*\\(defn " source))))
      (define is-python (or (equal? lang "python")
                           (and (not lang) (regexp-match? #rx"^\\s*def " source))))
      (define fn-id
-       (if is-python
-           (modify-python-function! fn-name source)
-           (modify-beagle-function! fn-name source)))
+       (cond [is-cnf (cnf-modify-function! fn-name source)]
+             [is-python (modify-python-function! fn-name source)]
+             [else (modify-beagle-function! fn-name source)]))
      (define new-name (render-ref fn-id))
      (define obj-count (length (all-objects)))
      (define claim-count (length (claims-where)))
@@ -1089,6 +1134,48 @@
              fn-name
              (if (equal? fn-name new-name) "" (format " → ~a" new-name))
              fn-id obj-count claim-count)]
+
+    [("evaluate")
+     (define fn-arg (hash-ref arguments 'function))
+     (define arg-vals (hash-ref arguments 'args))
+     (define fuel (hash-ref arguments 'fuel 10000))
+     (define fn-id
+       (cond
+         [(object-exists? fn-arg) fn-arg]
+         [else
+          (define resolved (resolve-symbol fn-arg))
+          (unless resolved
+            (error 'evaluate "unknown function: ~a" fn-arg))
+          resolved]))
+     (define run-id (eval-function! fn-id arg-vals #:fuel fuel))
+     (define status
+       (resolve-value (node-ref run-id (run-status-pred))))
+     (define result-node (node-ref run-id (run-result-pred)))
+     (define result-val
+       (and result-node (node-value result-node)))
+     (define fuel-used
+       (resolve-value (node-ref run-id (fuel-used-pred))))
+     (define reason
+       (resolve-value (node-ref run-id (run-reason-pred))))
+     (define lines
+       (list (format "Run: ~a" run-id)
+             (format "Function: ~a (~a)" (render-ref fn-id) fn-id)
+             (format "Status: ~a" status)
+             (if result-val
+                 (format "Result: ~a (node: ~a)" result-val result-node)
+                 (if result-node
+                     (format "Result node: ~a" result-node)
+                     "Result: none"))
+             (format "Fuel: ~a/~a used" (or fuel-used "?") fuel)))
+     (define extra
+       (cond
+         [reason (list (format "Reason: ~a" reason))]
+         [else '()]))
+     (string-join (append lines extra
+                          (list ""
+                                "Query the run entity to inspect provenance, "
+                                "reduction steps, and error details."))
+                  "\n")]
 
     [else
      (error 'handle-tool "Unknown tool: ~a" name)]))
@@ -1211,21 +1298,32 @@
               (define tool-name
                 (and (equal? (hash-ref msg 'method #f) "tools/call")
                      (hash-ref (hash-ref msg 'params (hasheq)) 'name #f)))
-              (if (and tool-name (read-only-tool? tool-name))
-                  (parameterize ([current-ctx (unbox committed)])
-                    (define response (make-response msg))
-                    (when response
-                      (write-json response out)
-                      (write-char #\newline out)
-                      (flush-output out)))
-                  (call-with-semaphore write-sem
-                    (lambda ()
-                      (define response (make-response msg))
-                      (when response
-                        (write-json response out)
-                        (write-char #\newline out)
-                        (flush-output out))
-                      (set-box! committed (snapshot-ctx)))))
+              (cond
+                [(and tool-name (read-only-tool? tool-name))
+                 (parameterize ([current-ctx (unbox committed)])
+                   (define response (make-response msg))
+                   (when response
+                     (write-json response out)
+                     (write-char #\newline out)
+                     (flush-output out)))]
+                [tool-name
+                 (call-with-semaphore write-sem
+                   (lambda ()
+                     (parameterize ([current-ctx (unbox committed)])
+                       (current-ctx (snapshot-ctx))
+                       (define response (make-response msg))
+                       (when response
+                         (write-json response out)
+                         (write-char #\newline out)
+                         (flush-output out))
+                       (set-box! committed (snapshot-ctx)))))]
+                [else
+                 (parameterize ([current-ctx (unbox committed)])
+                   (define response (make-response msg))
+                   (when response
+                     (write-json response out)
+                     (write-char #\newline out)
+                     (flush-output out)))])
               (loop)])))
        (close-input-port in)
        (close-output-port out)))

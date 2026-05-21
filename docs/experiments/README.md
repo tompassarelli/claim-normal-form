@@ -35,6 +35,7 @@ a maintained semantic index than against text files.
 | F8 | Parallel race | [results](f8-parallel-race/results.md) | **Git-parallel vs CNF-parallel, 2 and 5 agents. Git 82s (build + repair). CNF 28s (all parallel, 0 repairs). CNF 3x faster. Repair cost (56s) is the entire delta.** |
 | F9 | Real parallel race | [results](f9-real-race/results.md) | **6 real Claude Sonnet agents, wall clock. Git 68s (build + 48s repair). CNF 34s (0 repairs). CNF 2x faster. Same 4 structural bugs as F2/F8, every run.** |
 | F10 | Live graph race | [results](f10-live-race/results.md) | **6 real agents, live CNF daemon. Graph-derived context from live queries. Git 16.5/22 first-pass, CNF 20/22. Same 4 info-gap bugs eliminated. Direct agent queries work technically but agents can't navigate Datalog schema yet.** |
+| F11 | Agent tools | [results](f11-agent-tools/results.json) | **4 conditions: git 4/4 info-gap bugs, wrapped 1/4, raw 4/4, discover-style tools 0/4. First 0/4 result. Tool abstraction + prompt engineering + MVCC bug fix. 20/22 first-pass, 44s build.** |
 
 ## The arc
 
@@ -230,3 +231,23 @@ into agent prompts. Same correctness result: 20/22 CNF vs 16.5/22 git
 agent graph queries work technically (all bridges connect) but agents
 can't navigate the Datalog schema effectively — the coordinator-mediated
 pattern is the practical approach for now.
+
+F11 removed the coordinator and gave agents direct graph access through
+MCP tools — no Bash, no Read, no grep. Four conditions tested the same
+six agents building the same CRM modules. Git baseline: 4/4 info-gap
+bugs. Wrapped (7 high-level tools): 1/4. Raw Datalog (4 low-level
+tools with schema docs): 4/4 — same as git. The raw agent couldn't
+navigate the 4-step entity chain despite having documentation. Then a
+fourth condition: 4 discover-style tools (`discover`, `discover_all`,
+`dependencies`, `declare_intent`), each returning a complete actionable
+answer in one call. Combined with prompt engineering that actively
+blocks guessing ("values differ from what you would guess") and a fix
+for an MVCC bug in the daemon (`reset-store!` replaced the context
+parameter, making writes invisible to new connections). Result: **0/4
+info-gap bugs.** 20/22 first-pass (the 2 remaining failures are spec
+interpretation, not missing information). First time any condition has
+achieved 0/4. All four agents that needed TERMINAL_STATUSES wrote
+`from workflow import TERMINAL_STATUSES` because `discover()` returned
+the values, module, and exact import statement. The lesson: tool
+abstraction + prompt design + reliable infrastructure. All three were
+necessary; any one missing and agents revert to guessing.

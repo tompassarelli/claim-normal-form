@@ -102,6 +102,16 @@ def daemon_create_entity(sock):
 
 _intents = []
 
+
+def _get_module_for_entity(sock, eid):
+    """Look up which module an entity was defined in via source-module claims."""
+    query_text = daemon_query(sock, f"(current-triple {eid} source-module (? mod))")
+    if query_text and "?" in query_text:
+        match = re.search(r'\(value:\s*([^)]+)\)', query_text)
+        if match:
+            return match.group(1).strip()
+    return "unknown"
+
 # ── High-level tool implementations ──
 
 def handle_list_values(sock, args):
@@ -258,7 +268,8 @@ def handle_where_defined(sock, args):
             if match:
                 kind = match.group(1).strip()
 
-    return json.dumps({"symbol": symbol, "entity": eid, "kind": kind})
+    module = _get_module_for_entity(sock, eid)
+    return json.dumps({"symbol": symbol, "entity": eid, "kind": kind, "module": module})
 
 
 def handle_declare_intent(sock, args):
@@ -348,7 +359,7 @@ TOOLS = {
         "handler": handle_where_defined,
         "schema": {
             "name": "where_defined",
-            "description": "Find where a symbol is defined — which module and what kind (function, variable, class).",
+            "description": "Find where a symbol is defined — which module it's in and what kind (function, variable, class). Use the module name to write correct import statements.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

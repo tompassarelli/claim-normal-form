@@ -2,7 +2,10 @@
   "mcpServers": {
     "graph": {
       "command": "/run/current-system/sw/bin/python3",
-      "args": ["/home/tom/code/cnf-racket/experiments/f11-agent-tools/agent-tools.py", "7892"]
+      "args": [
+        "/home/tom/code/cnf-racket/experiments/f11-agent-tools/agent-tools.py",
+        "7893"
+      ]
     }
   }
 }

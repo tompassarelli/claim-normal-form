@@ -1,0 +1,180 @@
+;; ═══ Layer 0: Core utilities ═══
+;; "helper" is Agent B's RENAME target.
+;; Functions with "helper" in their name are NOT the target.
+
+(defn helper [x y]
+  (+ x y))
+
+(defn helper-rate [hours rate]
+  (* hours rate))
+
+(defn tax-helper [income pct]
+  (* income pct))
+
+(defn scale [x factor]
+  (* x factor))
+
+(defn offset [x delta]
+  (+ x delta))
+
+;; ═══ Layer 0: Division functions ═══
+;; Agent A must make these safe (guard against y=0).
+
+(defn ratio [a b]
+  (/ a b))
+
+(defn share [total parts]
+  (/ total parts))
+
+(defn split-even [total count]
+  (/ total count))
+
+(defn average [a b]
+  (/ (+ a b) 2))
+
+(defn percent [value whole]
+  (/ (* value 100) whole))
+
+;; ═══ Layer 1: Helper-only callers (Agent B territory) ═══
+
+(defn compute-a [a b]
+  (* (helper a b) 2))
+
+(defn compute-b [a b]
+  (+ (helper a b) 10))
+
+(defn compute-c [x y]
+  (- (helper x y) 5))
+
+(defn compute-d [a b]
+  (* (helper a b) (helper b a)))
+
+(defn compute-e [a b]
+  (+ (helper a b) (scale a b)))
+
+;; ═══ Layer 1: Division-only callers (Agent A territory) ═══
+
+(defn cost-per-unit [total units]
+  (ratio total units))
+
+(defn even-split [amount people]
+  (split-even amount people))
+
+(defn markup-pct [cost revenue]
+  (percent (- revenue cost) cost))
+
+(defn avg-price [low high]
+  (average low high))
+
+(defn fair-share [pool members]
+  (share pool members))
+
+;; ═══ OVERLAP ZONE: call helper AND use division ═══
+;; Both agents must touch these functions.
+;; Agent A: add safe division guard
+;; Agent B: rename helper → utility in call sites
+
+(defn calc-ratio [a b]
+  (/ (helper a b) b))
+
+(defn calc-average [a b]
+  (/ (helper a b) 2))
+
+(defn calc-share [total parts]
+  (/ (helper total parts) parts))
+
+(defn calc-rate [base hours]
+  (/ (helper base hours) hours))
+
+(defn calc-pct [value total]
+  (/ (* (helper value total) 100) total))
+
+;; ═══ Parameter traps: "helper" as parameter name ═══
+
+(defn process-a [helper x]
+  (* helper x))
+
+(defn process-b [helper offset]
+  (+ helper offset))
+
+(defn process-c [x helper]
+  (- x helper))
+
+;; ═══ Layer 2: Transitive callers (chains through overlap zone) ═══
+
+(defn chain-a [a b]
+  (+ (calc-ratio a b) (compute-a a b)))
+
+(defn chain-b [a b]
+  (- (calc-average a b) (compute-b a b)))
+
+(defn chain-c [x y]
+  (* (calc-share x y) (cost-per-unit x y)))
+
+(defn chain-d [a b]
+  (+ (calc-rate a b) (even-split a b)))
+
+(defn chain-e [a b]
+  (- (calc-pct a b) (markup-pct a b)))
+
+;; ═══ Layer 2: Mixed callers ═══
+
+(defn mixed-a [a b]
+  (+ (helper a b) (ratio a b)))
+
+(defn mixed-b [x y]
+  (- (compute-a x y) (cost-per-unit x y)))
+
+(defn mixed-c [a b]
+  (* (calc-ratio a b) (fair-share a b)))
+
+;; ═══ Layer 3: Deep aggregation ═══
+
+(defn deep-a [a b]
+  (* (chain-a a b) 2))
+
+(defn deep-b [a b]
+  (+ (chain-b a b) (chain-c a b)))
+
+(defn deep-c [x y]
+  (- (chain-d x y) (chain-e x y)))
+
+(defn deep-d [a b]
+  (+ (mixed-a a b) (mixed-b a b)))
+
+;; ═══ Filler: unrelated to helper or division ═══
+
+(defn pure-a [x y]
+  (+ x y))
+
+(defn pure-b [x y]
+  (* x y))
+
+(defn pure-c [x y]
+  (- x y))
+
+(defn pure-d [a b]
+  (+ (* a a) (* b b)))
+
+(defn pure-e [a b]
+  (- (* a b) (+ a b)))
+
+(defn pure-f [x y]
+  (* (+ x y) (- x y)))
+
+(defn pure-g [a b]
+  (+ (pure-a a b) (pure-b a b)))
+
+(defn pure-h [a b]
+  (- (pure-d a b) (pure-e a b)))
+
+;; ═══ Final: top-level summaries ═══
+
+(defn summary-a [a b]
+  (+ (deep-a a b) (deep-b a b)))
+
+(defn summary-b [a b]
+  (- (deep-c a b) (deep-d a b)))
+
+(defn summary-c [x y]
+  (* (chain-a x y) (pure-f x y)))

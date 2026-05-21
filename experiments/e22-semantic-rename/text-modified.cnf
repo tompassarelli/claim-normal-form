@@ -1,0 +1,193 @@
+;; ═══ Layer 0: Base utilities ═══
+;; "helper" is the TARGET function for rename.
+;; Other functions contain "helper" in their names — they are NOT the target.
+
+(defn safe-helper [x y]
+  (+ x y))
+
+(defn helper-rate [hours rate]
+  (* hours rate))
+
+(defn tax-helper [income pct]
+  (/ (* income pct) 100))
+
+(defn old-helper [x y]
+  (- x y))
+
+(defn rate-helper [base factor]
+  (* base factor))
+
+(defn helper-sum [a b]
+  (+ (* a 2) b))
+
+(defn base-calc [x y]
+  (* x y))
+
+(defn margin [cost pct]
+  (/ (* cost pct) 100))
+
+(defn discount [price cut]
+  (- price cut))
+
+(defn markup [cost factor]
+  (* cost (+ 1 factor)))
+
+;; ═══ Layer 1: Direct callers of helper (TRUE call sites) ═══
+
+(defn compute-a [a b]
+  (* (safe-helper a b) 2))
+
+(defn compute-b [a b]
+  (+ (safe-helper a b) 10))
+
+(defn compute-c [x y]
+  (- (safe-helper x y) 5))
+
+(defn compute-d [a b]
+  (if (= b 0) 0 (/ (safe-helper a b) 2)))
+
+(defn compute-e [x y]
+  (* (safe-helper x y) (safe-helper x y)))
+
+(defn compute-f [a b]
+  (+ (safe-helper a b) (safe-helper b a)))
+
+;; ═══ Layer 1: Callers of helper-NAMED functions (NOT helper) ═══
+
+(defn payroll-a [hours rate]
+  (* (helper-rate hours rate) 52))
+
+(defn payroll-b [hours rate]
+  (+ (helper-rate hours rate) 100))
+
+(defn payroll-c [hours rate]
+  (- (helper-rate hours rate) 50))
+
+(defn tax-a [income pct]
+  (- income (tax-helper income pct)))
+
+(defn tax-b [income pct]
+  (* (tax-helper income pct) 2))
+
+(defn legacy-a [x y]
+  (* (old-helper x y) 2))
+
+(defn legacy-b [x y]
+  (+ (old-helper x y) 1))
+
+(defn rated-a [base factor]
+  (+ (rate-helper base factor) 10))
+
+(defn sum-a [a b]
+  (* (helper-sum a b) 3))
+
+(defn sum-b [a b]
+  (+ (helper-sum a b) (helper-sum b a)))
+
+;; ═══ Parameter traps: "helper" as a parameter name ═══
+
+(defn process-a [helper x]
+  (* helper x))
+
+(defn process-b [helper offset]
+  (+ helper offset))
+
+(defn process-c [x helper]
+  (- x helper))
+
+(defn process-d [helper factor]
+  (if (= factor 0) 0 (/ helper factor)))
+
+;; ═══ Layer 2: Transitive callers (→ compute-X → helper) ═══
+
+(defn chain-a [a b]
+  (+ (compute-a a b) (compute-b a b)))
+
+(defn chain-b [a b]
+  (- (compute-c a b) (compute-d a b)))
+
+(defn chain-c [x y]
+  (* (compute-e x y) 2))
+
+(defn chain-d [a b]
+  (+ (compute-f a b) (compute-a b a)))
+
+(defn chain-e [x y]
+  (- (compute-a x y) (compute-c x y)))
+
+;; ═══ Layer 2: Mixed callers (call BOTH helper and helper-named) ═══
+
+(defn mix-a [a b]
+  (+ (safe-helper a b) (helper-rate a b)))
+
+(defn mix-b [x y]
+  (- (safe-helper x y) (old-helper x y)))
+
+(defn mix-c [a b]
+  (* (safe-helper a b) (base-calc a b)))
+
+(defn mix-d [x y]
+  (+ (compute-a x y) (payroll-a x y)))
+
+;; ═══ Layer 3: Deep chains ═══
+
+(defn deep-a [a b]
+  (* (chain-a a b) 2))
+
+(defn deep-b [a b]
+  (+ (chain-b a b) (chain-c a b)))
+
+(defn deep-c [x y]
+  (- (chain-d x y) (chain-a x y)))
+
+(defn deep-d [a b]
+  (+ (chain-e a b) (deep-a a b)))
+
+;; ═══ Filler: unrelated to helper ═══
+
+(defn pure-a [x y]
+  (+ x y))
+
+(defn pure-b [x y]
+  (* x y))
+
+(defn pure-c [x y]
+  (- x y))
+
+(defn pure-d [x y]
+  (if (= y 0) 0 (/ x y)))
+
+(defn pure-e [a b]
+  (+ (* a a) (* b b)))
+
+(defn pure-f [a b]
+  (- (* a b) (+ a b)))
+
+(defn pure-g [x y]
+  (* (+ x y) (- x y)))
+
+(defn pure-h [a b]
+  (if (= a 0) b (/ (+ a b) 2)))
+
+(defn pure-i [x y]
+  (+ (pure-a x y) (pure-b x y)))
+
+(defn pure-j [a b]
+  (- (pure-e a b) (pure-f a b)))
+
+;; ═══ Final: aggregate functions ═══
+
+(defn final-a [a b]
+  (+ (deep-a a b) (mix-a a b)))
+
+(defn final-b [a b]
+  (- (deep-b a b) (mix-b a b)))
+
+(defn final-c [x y]
+  (* (deep-c x y) (pure-e x y)))
+
+(defn summary-a [a b]
+  (+ (final-a a b) (final-b a b)))
+
+(defn summary-b [x y]
+  (- (final-c x y) (pure-i x y)))

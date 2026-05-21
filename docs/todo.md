@@ -598,6 +598,197 @@ the practical approach. Higher-level query tools are the next step.
 See `docs/experiments/f10-live-race/results.md` and
 `docs/devlog/030-f10-live-race.md`.
 
+## DONE: F11 — Agent Tools
+
+Graph-only tools, no file access. Four conditions tested:
+
+| Condition | Info-gap bugs | First-pass |
+|-----------|--------------|------------|
+| Git       | 4/4          | 16/22      |
+| Wrapped   | 1/4          | 17/22      |
+| Raw       | 4/4          | 15/22      |
+| Discover  | **0/4**      | **20/22**  |
+
+First 0/4 info-gap result. Three things required:
+
+1. **Tool abstraction**: `discover("TERMINAL_STATUSES")` returns
+   values + module + import in one call (vs 4-step Datalog chain)
+2. **Prompt engineering**: "values differ from what you would guess"
+   blocks agents from skipping the tool call
+3. **MVCC bug fix**: `reset-store!` replaced current-ctx parameter,
+   making writes invisible to new connections. Only affects
+   multi-connection scenarios (F11 is the first). Prior experiments
+   unaffected.
+
+See `docs/devlog/032-f11-agent-tools.md` and
+`experiments/f11-agent-tools/results.json`.
+
+## NOW: Graph Runtime — The Graph Is the Program
+
+The graph is no longer a mirror of source code. It IS the program.
+Agents construct program shapes as claims. A reducer evaluates the
+claim graph directly. Files become projections, not sources.
+
+Three layers, one graph:
+1. **Claim store** — canonical program representation as EAV triples
+2. **Datalog** — derived semantic truth (types, deps, validity)
+3. **Reducer** — evaluates executable claim-graph terms
+
+### DONE: Core calculus
+
+literal, var, lambda, apply, binop, let, if. Provenance-preserving
+reductions. Environment-based closures. Structural bindings. 11 tests.
+Victory condition met: `((λ x (+ x 1)) 5) → 6` with full provenance.
+See `docs/devlog/033-graph-is-the-program.md`.
+
+### DONE: Letrec + fuel
+
+`letrec` via two-phase env patching. Shared fuel budget with queryable
+exhaustion claims. `exn:fuel` exception carries the incomplete node ID.
+Factorial(5) = 120. Infinite loop bounded without hanging. 15 tests.
+See `docs/devlog/034-letrec-and-fuel.md`.
+
+### DONE: Unified graph (lang.rkt → graph-eval nodes)
+
+lang.rkt constructs graph-eval nodes directly (`lit!`/`var!`/`binop!`/`app!`).
+Compat shim (`expr!`/`run!`/`eval-step!`) deleted. One representation,
+two uses: same nodes for Datalog analysis and graph-eval reduction.
+Parse → render → evaluate → query dependencies, all against one graph.
+17 lang tests (was 8), 376 total. See `docs/devlog/034-letrec-and-fuel.md`.
+
+### DONE: MCP evaluate tool + eval-function!
+
+Agent loop closed. `evaluate` MCP tool runs `graph-eval` against parsed
+functions and records the outcome as queryable claims (eval-run entity
+with status, result, fuel, reason, error-node). `eval-function!` builds
+curried lambdas, mutual env with placeholder patching, evaluates the call.
+
+Runtime failure is graph data, not just an exception. 31 MCP tools
+(was 30). 23 lang tests (was 17), 396 total.
+See `docs/devlog/034-letrec-and-fuel.md`.
+
+### DONE: E20 — Graph-Native Agent Loop
+
+10-step demo: parse → query deps → evaluate → rename → re-evaluate →
+add function → evaluate across boundaries → break (div/zero) → diagnose
+error as graph data → fix → re-evaluate. All against one claim graph.
+6 eval runs retained as queryable entities. Run
+`racket experiments/e20-graph-loop.rkt`. See
+`docs/experiments/e20-graph-loop/results.md`.
+
+### DONE: E21 — Live Agent Race
+
+Head-to-head: text agent (files + shell + eval-helper) vs graph agent
+(MCP tools). Same Sonnet model, same 10-step task: parse → reproduce
+div-by-zero → add safe-div → wire it in → verify → query deps → rename
+→ verify post-rename → query error history.
+
+Both agents completed all 10 steps. Text: 64.7s. Graph: 103.6s.
+
+The graph agent's structural advantage showed on step 10 (error
+history from step 3 still queryable as run entity 1240 with status,
+reason, function ID) and step 8 (semantic rename — one operation, all
+call sites auto-update). The text agent correctly identified error
+history as architecturally impossible ("cross-invocation history is an
+architectural limitation of the in-memory store").
+
+Text wins on speed at toy scale. Graph wins on capabilities that
+compound with scale.
+
+Bug found and fixed during the race: server.rkt `add_function` and
+`modify_function` didn't route to cnf toy lang (only Python/Beagle).
+Also added `if` and `=` to the toy lang parser (eval already supported
+both). 396 tests green.
+
+See `experiments/e21-graph-race/` and
+`docs/experiments/e21-graph-race/results.md`.
+
+### DONE: E22 — Semantic Rename at Scale
+
+58 functions, name-ambiguity traps (5 trap function names, 4 parameter
+shadows, 9 true call sites). Rename `helper` → `safe-helper`.
+
+Text: 157.3s. Graph: 138.2s. **Graph faster for the first time.**
+
+Both agents scored perfectly: 9/9 call sites, 0 false positives, all
+trap names preserved, all parameters untouched. The graph rename is
+correct by construction (one entity operation); the text rename required
+careful structural understanding of the 58-function program.
+
+Error history: graph retains eval-run entity 25674 (division by zero
+from step 3), queryable after fix + rename. Text has no mechanism.
+
+Bug found: `resolve-fn-name` couldn't distinguish function entities from
+parameter entities sharing the same name. Fixed via `position-pred`
+filtering. Only surfaced at scale with name collisions.
+
+Speed crossover: E21 (5 fn) text 1.6x faster → E22 (58 fn) graph 1.1x
+faster. Text rename cost scales O(N); graph rename cost is O(1).
+
+See `experiments/e22-semantic-rename/` and
+`docs/experiments/e22-semantic-rename/results.md`.
+
+### DONE: E23 — Concurrent Agents
+
+Two agents, overlapping tasks, 51-function program. Agent A adds safe
+division (8 functions guarded). Agent B renames helper → utility (11
+call sites). Five overlap functions need both changes.
+
+Graph: 104.5s. Text: 137.7s. Both correct. Graph 1.3x faster.
+
+Speed trend: E21 text 1.6x faster → E22 graph 1.1x faster → E23
+graph 1.3x faster. Entity-level operations compound.
+
+Graph agents used independent servers (not shared daemon). Daemon MVCC
+has a cross-connection snapshot visibility bug — snapshots published by
+one connection aren't visible to subsequent connections. Blocks the
+true shared-graph concurrent coordination test.
+
+Text agents accidentally edited the same file (best-case coordination)
+but were still slower. Error history: graph queryable (run 14595),
+text not retained.
+
+See `experiments/e23-concurrent-agents/` and
+`docs/experiments/e23-concurrent-agents/results.md`.
+
+### DONE: Fix daemon MVCC cross-connection bug
+
+The committed snapshot box was clobbered when non-tool messages
+(initialize, ping, notifications) from new connections fell to the
+write-path else branch and overwrote committed with the new thread's
+stale context. Write tools from new connections also operated on stale
+thread-local state instead of committed.
+
+Fix: restructured daemon handler from 2-branch if/else to 3-branch
+cond. Read-only tools parameterize from committed. Write tools take
+semaphore, deep-copy committed into working context, process, save
+snapshot back. Non-tool messages parameterize from committed without
+updating it. Test: `tests/test-daemon-mvcc.py` — Connection A parses,
+Connection B sees A's state, Connection B writes build on A's state,
+Connection C sees accumulated state.
+
+### DONE: E23b — Shared daemon re-run
+
+Both agents on same daemon. Graph: 0 conflicts, 26/26 verification,
+both changes integrated (`(safe-div (utility a b) b)` in overlap zone).
+Text (fixed isolation): 4 conflicts, definition lost in merge. MVCC
+witness: fresh TCP connection sees pre-agents 2474 objects → post-agents
+24714 objects. Error history (run 35249) queryable by fresh connection.
+
+See `experiments/e23-concurrent-agents/` and
+`docs/experiments/e23-concurrent-agents/results.md`.
+
+### OPEN: Totality as a per-node queryable property
+
+Fuel is scaffold. It answers "can the evaluator avoid hanging?" not
+"does this program terminate?" The strongest version classifies each
+node: provably total, fuel-bounded, effectful, unknown. That makes
+"which parts are guaranteed vs empirical?" a query the substrate can
+answer — a property no normal language has.
+
+Not building now. Holding the question open. The fuel-exhaustion claim
+infrastructure is already the skeleton of this feature.
+
 ## LATER: BEAM Runtime
 
 CNF is the data model. Datalog is the reasoning layer. BEAM is the

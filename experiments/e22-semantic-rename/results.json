@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-05-21 22:10:05",
+  "model": "sonnet",
+  "timeout": 300,
+  "functions": 58,
+  "true_callers": 9,
+  "trap_names": 5,
+  "param_traps": 4,
+  "text": {
+    "elapsed": 157.30134776601335,
+    "error": null,
+    "verification": {
+      "defn_safe_helper": true,
+      "defn_helper_gone": true,
+      "preserved_helper-rate": true,
+      "preserved_tax-helper": true,
+      "preserved_old-helper": true,
+      "preserved_rate-helper": true,
+      "preserved_helper-sum": true,
+      "no_safe_helper_rate": true,
+      "no_safe_helper_sum": true,
+      "no_tax_safe_helper": true,
+      "no_old_safe_helper": true,
+      "no_rate_safe_helper": true,
+      "param_process-a": true,
+      "param_process-b": true,
+      "param_process-c": true,
+      "param_process-d": true,
+      "callsite_compute-a": true,
+      "callsite_compute-b": true,
+      "callsite_compute-c": true,
+      "callsite_compute-d": false,
+      "callsite_compute-e": true,
+      "callsite_compute-f": true,
+      "callsite_mix-a": true,
+      "callsite_mix-b": true,
+      "callsite_mix-c": true
+    }
+  },
+  "graph": {
+    "elapsed": 138.22370303503703,
+    "error": null,
+    "verification": {
+      "parsed_58": true,
+      "baseline_7": false,
+      "baseline_14": true,
+      "error_recorded": true,
+      "renamed": true,
+      "helper_rate_preserved": true,
+      "error_history": true,
+      "no_false_positive": true
+    }
+  }
+}

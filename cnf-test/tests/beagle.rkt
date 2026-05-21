@@ -3,7 +3,7 @@
 (require rackunit
          cnf/private/kernel
          cnf/private/datalog
-         cnf/private/eval
+         (only-in cnf/private/eval setup-eval! register-primitive!)
          cnf/private/graph
          cnf/private/schema
          cnf/private/beagle)

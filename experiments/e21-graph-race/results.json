@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-05-21 21:38:28",
+  "model": "sonnet",
+  "timeout": 300,
+  "text": {
+    "elapsed": 64.72813133598538,
+    "error": null,
+    "transcript_length": 2581,
+    "score": {
+      "step1_parse": true,
+      "step2_baseline": true,
+      "step3_error": true,
+      "step4_safediv": true,
+      "step5_wire": true,
+      "step6a_verify": true,
+      "step6b_zero": true,
+      "step7_deps": true,
+      "step8_rename": true,
+      "step9_postrename": true,
+      "step10_history": true
+    }
+  },
+  "graph": {
+    "elapsed": 103.62149878300261,
+    "error": null,
+    "transcript_length": 1293,
+    "score": {
+      "step1_parse": true,
+      "step2_baseline": true,
+      "step3_error": true,
+      "step4_safediv": true,
+      "step5_wire": true,
+      "step6a_verify": true,
+      "step6b_zero": true,
+      "step7_deps": false,
+      "step8_rename": true,
+      "step9_postrename": true,
+      "step10_history": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cnf": {
+      "command": "/run/current-system/sw/bin/python",
+      "args": [
+        "/home/tom/code/cnf-racket/experiments/e23-concurrent-agents/cnf-bridge.py",
+        "7892"
+      ]
+    }
+  }
+}

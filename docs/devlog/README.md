@@ -38,3 +38,11 @@ Each entry is a snapshot of understanding at the time it was written.
 | 029 | 2026-05-21 | [F9: Real agents, real race](029-f9-real-race.md) |
 | 030 | 2026-05-21 | [F10: Live graph race](030-f10-live-race.md) |
 | 031 | 2026-05-21 | [The harvest — capturing what agents actually think](031-harvest-discovery.md) |
+| 032 | 2026-05-21 | [F11: Agent tools — 0/4 info-gap bugs](032-f11-agent-tools.md) |
+| 033 | 2026-05-21 | [The graph is the program](033-graph-is-the-program.md) |
+| 034 | 2026-05-21 | [Letrec, fuel, and the unified graph](034-letrec-and-fuel.md) |
+| 035 | 2026-05-21 | [E21: The race](035-e21-graph-race.md) |
+| 036 | 2026-05-21 | [E22: Semantic rename at scale](036-e22-semantic-rename.md) |
+| 037 | 2026-05-21 | [Graph runtime synthesis: E20–E22](037-graph-runtime-synthesis.md) |
+| 038 | 2026-05-21 | [E23: Concurrent agents](038-e23-concurrent-agents.md) |
+| 039 | 2026-05-22 | [E23b: Shared daemon proves coordination thesis](039-e23b-shared-daemon.md) |
