@@ -162,7 +162,7 @@ is untouched.
 
 ### The experiment arc
 
-20 experiments tracked the evolution. Key inflection points:
+28 experiments tracked the evolution. Key inflection points:
 
 - **E15–E16**: CNF answers structural queries correctly (entity
   resolution, transitive closure, shadowed names). Text search gets
@@ -198,6 +198,10 @@ is untouched.
   agents. Git 82s (parallel build + 56s repair). CNF 28s
   (all parallel, live graph accumulation, 0 repairs).
   **CNF 3x faster.** Repair cost (56s) is the entire delta.
+- **F9**: Real parallel race. Six real Claude Sonnet agents, wall
+  clock measured. Git 68s (build + 48s repair). CNF 34s (build,
+  0 repairs). **CNF 2x faster.** Same 4 structural bugs as F2/F8,
+  every run. The prediction holds with real LLM inference.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -294,7 +298,7 @@ Claude Code MCP configuration (`.claude/settings.json`):
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 27 experiments (E1–E19, F2–F8) with raw results |
+| **[Experiments](docs/experiments/)** | 28 experiments (E1–E19, F2–F9) with raw results |
 | **[Devlog](docs/devlog/)** | 28 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
@@ -314,12 +318,11 @@ overlapping edits (F4), and scaling agent count (F5). CNF holds at
 100% across all experiments while git ranges from 50% to 89%.
 
 F6 tested wall clock time to correct code. Git won 1.8x (276s vs
-500s) because CNF ran sequentially. F8 fixed this: all agents build
-in parallel with live graph accumulation. **CNF wins 3x** (28s vs
-82s). Both conditions take the same 26s for parallel agent inference.
-The entire delta is repair — git agents produce 4 structural bugs
-requiring 56s of LLM repair, while CNF agents query the graph and
-build correctly on the first pass.
+500s) because CNF ran sequentially. F8 fixed this with projected
+timing: all agents in parallel, **CNF 3x faster** (28s vs 82s).
+F9 confirmed with real Claude Sonnet agents: **CNF 2x faster**
+(34s vs 68s mean across two runs). Same 4 structural bugs every
+run — the prediction from F2/F8 holds with real LLM inference.
 
 F7 tested whether the semantic graph itself is necessary (vs. just
 reading files). The graph's value is precision (60% vs 35%) and

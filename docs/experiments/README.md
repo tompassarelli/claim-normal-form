@@ -33,6 +33,7 @@ a maintained semantic index than against text files.
 | F6 | Time to correct | [results](f6-time-to-correct/results.md) | **Real agents, wall clock to 28/28. Git 276s (parallel + 1 repair round). CNF 500s (sequential, 0 repairs). Git 1.8x faster. Parallelism beats correctness at this scale.** |
 | F7 | Graph necessity | [results](f7-graph-necessity/results.md) | **18 modules, 49 tests, 7 edit sites. Same recall all 3 conditions (6/7, 86%). Graph precision 60% vs grep 35%. Graph 11 tool calls vs grep 35 (3.2x). The graph filters, it doesn't find.** |
 | F8 | Parallel race | [results](f8-parallel-race/results.md) | **Git-parallel vs CNF-parallel, 2 and 5 agents. Git 82s (build + repair). CNF 28s (all parallel, 0 repairs). CNF 3x faster. Repair cost (56s) is the entire delta.** |
+| F9 | Real parallel race | [results](f9-real-race/results.md) | **6 real Claude Sonnet agents, wall clock. Git 68s (build + 48s repair). CNF 34s (0 repairs). CNF 2x faster. Same 4 structural bugs as F2/F8, every run.** |
 
 ## The arc
 
@@ -209,3 +210,11 @@ CNF agents query the shared graph and build correctly — zero repair.
 The entire delta is repair cost. The advantage compounds with scale:
 more agents mean more bugs, more repair rounds, while CNF's graph
 infrastructure stays constant (~2s).
+
+F9 confirmed F8's prediction with real LLM agents. Six Claude Sonnet
+agents launched as subprocesses, wall clock measured. Git 68s mean
+(build + 48s repair), CNF 34s mean (build, 0 repairs). CNF 2x faster.
+The same 4 structural bugs appear in every run — notifications fire for
+archived, admin lacks archive permission, analytics only counts open,
+escalation doesn't exclude archived. The bugs are deterministic given
+the information gap, not stochastic.

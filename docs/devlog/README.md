@@ -35,3 +35,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 026 | 2026-05-21 | [F7: Bridge validation spike](026-f7-bridge-spike.md) |
 | 027 | 2026-05-21 | [F7: The graph filters, it doesn't find](027-f7-agent-experiment.md) |
 | 028 | 2026-05-21 | [F8: CNF-parallel beats git-parallel](028-f8-parallel-race.md) |
+| 029 | 2026-05-21 | [F9: Real agents, real race](029-f9-real-race.md) |

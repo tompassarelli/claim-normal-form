@@ -559,6 +559,24 @@ At 10 agents, projected ~5x. At 20, ~7x.
 See `docs/experiments/f8-parallel-race/results.md` and
 `docs/devlog/028-f8-parallel-race.md`.
 
+## DONE: F9 — Real Parallel Race
+
+Real Claude Sonnet agents, parallel execution, wall clock measured.
+Six agents (audit, escalation, analytics, notifications, comments,
+permissions), 22 integration tests. Launched via `claude -p --model
+sonnet --tools ""` — real LLM inference, no pre-written code.
+
+Two runs. Git 18/22 → 22/22 after repair, both times. CNF 22/22,
+both times. Same 4 structural bugs every run (notifications,
+permissions, analytics, escalation). Mean: Git 68s (build + 48s
+repair), CNF 34s (build, 0 repairs). CNF 2x faster.
+
+Confirms F8's projected result with real agents. The bugs are
+deterministic given the information gap — identical to F2/F8.
+
+See `docs/experiments/f9-real-race/results.md` and
+`docs/devlog/029-f9-real-race.md`.
+
 ## LATER: BEAM Runtime
 
 CNF is the data model. Datalog is the reasoning layer. BEAM is the

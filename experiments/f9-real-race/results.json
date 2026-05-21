@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-05-21 13:13:20",
+  "agents": 6,
+  "git": {
+    "build_time": 24.48305090898066,
+    "test_time": 0.06868667498929426,
+    "repair_time": 50.08652969598188,
+    "total_time": 74.63826727995183,
+    "pass_before": 18,
+    "fail_before": 4,
+    "pass_after": 22,
+    "fail_after": 0,
+    "failures_before": [
+      "FAIL: test_10_archived_no_notification: Archived triggered notification: [{'ticket_id': 'T-1', 'message': \"Ticket T-1 'Old' has been reopened (status: archived).\", 'type': 'transition'}]",
+      "FAIL: test_11_archive_permission: Admin should have archive permission",
+      "FAIL: test_13_summary_has_all_statuses: Summary missing 'archived': {'open': 0, 'closed': 0, 'total': 0}",
+      "FAIL: test_20_escalation_skip_archived: Archived ticket should NOT be escalatable"
+    ],
+    "failures_after": [],
+    "agent_times": {
+      "audit": 6.441590938018635,
+      "escalation": 7.357673635007814,
+      "analytics": 14.714723696000874,
+      "notifications": 17.1631422220089,
+      "comments": 19.12749540101504,
+      "permissions": 24.480656212981557
+    }
+  },
+  "cnf": {
+    "build_time": 29.17556018399773,
+    "test_time": 0.06508165900595486,
+    "repair_time": 0,
+    "total_time": 29.240641843003687,
+    "pass_before": 22,
+    "fail_before": 0,
+    "pass_after": 22,
+    "fail_after": 0,
+    "failures_before": [],
+    "failures_after": [],
+    "agent_times": {
+      "audit": 6.806910560000688,
+      "escalation": 8.150398682017112,
+      "permissions": 9.489511847001268,
+      "comments": 14.424604831991019,
+      "analytics": 18.58217600901844,
+      "notifications": 29.17377828498138
+    }
+  }
+}
