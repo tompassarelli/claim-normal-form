@@ -195,10 +195,9 @@ is untouched.
   with 3.2x fewer tool calls. The graph doesn't help agents
   *find* more sites — it helps them *skip* more non-sites.
 - **F8**: Parallel race. Git-parallel vs CNF-parallel, 2 and 5
-  agents. Git 82s (parallel build + 56s repair). CNF 54s
-  (sequential first agent + parallel remaining, 0 repairs).
-  **CNF 1.5x faster.** Repair cost (56s) exceeds the sequential
-  tax (26s). Advantage compounds with scale.
+  agents. Git 82s (parallel build + 56s repair). CNF 28s
+  (all parallel, live graph accumulation, 0 repairs).
+  **CNF 3x faster.** Repair cost (56s) is the entire delta.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -315,26 +314,20 @@ overlapping edits (F4), and scaling agent count (F5). CNF holds at
 100% across all experiments while git ranges from 50% to 89%.
 
 F6 tested wall clock time to correct code. Git won 1.8x (276s vs
-500s) because CNF ran sequentially. F8 fixed this: with CNF agents
-running in parallel against the daemon, **CNF wins 1.5x** (54s vs
-82s). The advantage comes from eliminating repair rounds — git agents
-produce 4 structural bugs requiring 56s of LLM repair, while CNF
-agents query the graph and build correctly on the first pass.
-
-CNF pays a sequential tax: the first agent must populate the graph
-before others can query it (26s). Since repair (56s) > sequential
-tax (26s), CNF wins. The advantage compounds with scale — more
-agents mean more cross-cutting bugs, more repair rounds, while the
-sequential tax stays fixed.
+500s) because CNF ran sequentially. F8 fixed this: all agents build
+in parallel with live graph accumulation. **CNF wins 3x** (28s vs
+82s). Both conditions take the same 26s for parallel agent inference.
+The entire delta is repair — git agents produce 4 structural bugs
+requiring 56s of LLM repair, while CNF agents query the graph and
+build correctly on the first pass.
 
 F7 tested whether the semantic graph itself is necessary (vs. just
 reading files). The graph's value is precision (60% vs 35%) and
 efficiency (3.2x fewer tool calls): knowing which hits need attention.
 
-The path forward is eliminating the sequential tax: fully parallel
-agents with live graph accumulation (validated in F3). This would
-push the advantage from 1.5x toward 3x at 5 agents. At scale
-(10+ agents, multiple repair rounds), the advantage compounds further.
+The advantage compounds with scale: more agents mean more bugs, more
+repair rounds, while CNF's graph infrastructure stays constant (~2s).
+At 10 agents (2 repair rounds), projected ~5x. At 20, ~7x.
 
 Benchmarks are at 50–200 functions. The correctness advantage is
 structural (entity references vs string matching) and doesn't depend

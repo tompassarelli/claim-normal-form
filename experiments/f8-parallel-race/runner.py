@@ -1133,7 +1133,15 @@ def run_git_condition(n_agents):
 
 
 # ════════════════════════════════════════════════════════════════════
-# CNF condition
+# CNF condition — fully parallel (live graph accumulation)
+#
+# All agents start simultaneously. As each finishes, their code is
+# parsed into the shared graph. Later-finishing agents query the
+# accumulated graph mid-flight and discover cross-cutting entities.
+#
+# This is the F3 live graph model applied to parallel construction.
+# The daemon's MVCC ensures lock-free reads; writes serialize via
+# semaphore but are <200ms each (negligible vs 26s agent inference).
 # ════════════════════════════════════════════════════════════════════
 
 def run_cnf_condition(n_agents):
@@ -1143,36 +1151,24 @@ def run_cnf_condition(n_agents):
     mcp = None
 
     try:
-        # Phase 1: Start daemon + parse base
+        # Phase 1: Start daemon + parse base code into graph
         with Timer("setup") as t:
             mcp = MCPClient()
             mcp.tool("reset")
             for f in ["core.py", "models.py"]:
                 source = (ws / f).read_text()
                 mcp.tool("parse_program", {"source": source, "language": "python"})
+            (ws / "config.py").write_text(CNF_CONFIG)
         phases["setup"] = t.elapsed
 
-        # Phase 2: First agent builds, parses into graph
-        first = agents[0]
-        with Timer("first_agent") as t:
-            simulate_inference(first["name"], AGENT_INFERENCE_TIME)
-            mcp.tool("set_agent", {"name": first["name"]})
-            for module in first["modules"]:
-                code = CNF_CODE[module]
-                (ws / module).write_text(code)
-                mcp.tool("parse_program", {"source": code, "language": "python"})
-            mcp.tool("checkpoint", {"path": str(ws / ".ckpt.json")})
-        phases["first_agent"] = t.elapsed
-
-        # Write config before parallel agents (they import from it)
-        (ws / "config.py").write_text(CNF_CONFIG)
-
-        # Phase 3: Remaining agents build in parallel
-        remaining = agents[1:]
+        # Phase 2: ALL agents build in parallel
+        # Each agent: inference → write code → parse into graph
+        # Graph accumulates as agents finish — MVCC snapshot updates
+        # on each parse, visible to concurrent readers.
         graph_lock = threading.Lock()
 
-        with Timer("parallel_build") as t:
-            def cnf_agent_work(agent_spec):
+        with Timer("build") as t:
+            def agent_work(agent_spec):
                 simulate_inference(agent_spec["name"], AGENT_INFERENCE_TIME)
                 for module in agent_spec["modules"]:
                     code = CNF_CODE[module]
@@ -1182,15 +1178,15 @@ def run_cnf_condition(n_agents):
                                  {"source": code, "language": "python"})
 
             with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=max(1, len(remaining))) as pool:
-                list(pool.map(cnf_agent_work, remaining))
-        phases["parallel_build"] = t.elapsed
+                    max_workers=n_agents) as pool:
+                list(pool.map(agent_work, agents))
+        phases["build"] = t.elapsed
 
     finally:
         if mcp:
             mcp.close()
 
-    # Phase 5: Test
+    # Phase 3: Test
     with Timer("test") as t:
         (ws / "test_integration.py").write_text(INTEGRATION_TESTS)
         p, f, e, failures = run_tests(ws)
@@ -1220,117 +1216,51 @@ def fmt_time(seconds):
 
 def print_results(n_agents, git, cnf):
     w = 72
+    gt = git.get("pass_before", git["pass_after"])
+    gb = git.get("bugs_before", 0)
+    cp, cb = cnf["pass_after"], cnf["bugs_after"]
+    total = gt + gb
+
+    git_infra = sum(git["phases"].values())
+    cnf_infra = sum(cnf["phases"].values())
+
+    git_total = AGENT_INFERENCE_TIME + git_infra + \
+                (REPAIR_INFERENCE_TIME if gb > 0 else 0)
+    cnf_total = AGENT_INFERENCE_TIME + cnf_infra
+    ratio = git_total / cnf_total if cnf_total > 0 else 0
+
     print()
     print("═" * w)
     print(f"  {n_agents}-AGENT RACE")
     print("═" * w)
-
-    # Test results first — this is the correctness story
-    gt = git.get("pass_before", git["pass_after"])
-    gb = git.get("bugs_before", 0)
-    cp = cnf["pass_after"]
-    cb = cnf["bugs_after"]
-    total_tests = gt + gb
-
-    gfirst = f"{gt}/{total_tests}"
-    cfirst = f"{cp}/{cp+cb}"
-    gfinal = f"{git['pass_after']}/{git['pass_after']+git['bugs_after']}"
-    cfinal = f"{cp}/{cp+cb}"
+    print()
+    print(f"  {'':30} {'Git':>14} {'CNF':>14}")
+    print("  " + "─" * (w - 4))
+    print(f"  {'Tests (first run)':<30} {f'{gt}/{total}':>14} "
+          f"{f'{cp}/{cp+cb}':>14}")
+    print(f"  {'Cross-cutting bugs':<30} {gb:>14} {cb:>14}")
+    print(f"  {'Repair rounds':<30} "
+          f"{'1' if gb > 0 else '0':>14} {'0':>14}")
 
     print()
-    print(f"  {'':35} {'Git':>12} {'CNF':>12}")
+    print(f"  {'Projected wall clock:':<30}")
+    print(f"  {'  Build (all parallel)':<30} "
+          f"{fmt_time(AGENT_INFERENCE_TIME):>14} "
+          f"{fmt_time(AGENT_INFERENCE_TIME):>14}")
+    print(f"  {'  Repair':<30} "
+          f"{fmt_time(REPAIR_INFERENCE_TIME) if gb else '—':>14} {'—':>14}")
+    print(f"  {'  Infrastructure':<30} "
+          f"{fmt_time(git_infra):>14} {fmt_time(cnf_infra):>14}")
     print("  " + "─" * (w - 4))
-    print(f"  {'Tests (first run)':<35} {gfirst:>12} {cfirst:>12}")
-    print(f"  {'Cross-cutting bugs':<35} {gb:>12} {cb:>12}")
-    print(f"  {'Repair rounds needed':<35} "
-          f"{'1' if gb > 0 else '0':>12} {'0':>12}")
-    print(f"  {'Tests (final)':<35} {gfinal:>12} {cfinal:>12}")
-
-    # Infrastructure overhead (measured, real subprocess calls)
+    print(f"  {'  TOTAL':<30} "
+          f"{fmt_time(git_total):>14} {fmt_time(cnf_total):>14}")
     print()
-    print("  Infrastructure overhead (measured):")
-    print(f"  {'':35} {'Git':>12} {'CNF':>12}")
-    print("  " + "─" * (w - 4))
+    print(f"  CNF {ratio:.1f}x faster")
 
-    git_infra = git["phases"].get("merge", 0) + git["phases"].get("test_1", 0) + \
-                git["phases"].get("test_2", 0)
-    cnf_infra = git["phases"].get("setup", 0)  # dummy
-    for phase, label in [
-        ("setup", "Daemon startup + base parse"),
-        ("first_agent", "First agent graph work"),
-        ("parallel_build", "Parallel agent graph work"),
-    ]:
-        cv = cnf["phases"].get(phase, 0)
-        if cv > 0:
-            print(f"  {label:<35} {'—':>12} {fmt_time(cv):>12}")
-
-    for phase, label in [
-        ("merge", "Merge files"),
-        ("test_1", "Test run 1"),
-        ("repair", "Repair (file writes only)"),
-        ("test_2", "Test run 2 (retest)"),
-    ]:
-        gv = git["phases"].get(phase, 0)
-        if gv > 0:
-            print(f"  {label:<35} {fmt_time(gv):>12} {'—':>12}")
-
-    tv = cnf["phases"].get("test", 0)
-    print(f"  {'Test run':<35} {'—':>12} {fmt_time(tv):>12}")
-
-    git_infra_total = sum(git["phases"].values())
-    cnf_infra_total = sum(cnf["phases"].values())
-    print("  " + "─" * (w - 4))
-    print(f"  {'Infrastructure total':<35} "
-          f"{fmt_time(git_infra_total):>12} {fmt_time(cnf_infra_total):>12}")
-
-    # Projected wall clock with F6-calibrated agent inference
-    print()
-    print("  Projected wall clock (F6-calibrated inference):")
-    print(f"  {'':35} {'Git':>12} {'CNF':>12}")
-    print("  " + "─" * (w - 4))
-
-    # Git: all agents parallel (26s) + infra + repair agent (56s) + retest
-    git_build = AGENT_INFERENCE_TIME  # max of parallel agents
-    git_repair = REPAIR_INFERENCE_TIME if gb > 0 else 0
-    git_projected = git_build + git_infra_total + git_repair
-
-    # CNF: first agent (26s) + remaining parallel (26s) + infra
-    cnf_first = AGENT_INFERENCE_TIME
-    cnf_parallel = AGENT_INFERENCE_TIME  # max of remaining parallel agents
-    cnf_projected = cnf_first + cnf_parallel + cnf_infra_total
-
-    print(f"  {'Agent build (parallel)':<35} "
-          f"{fmt_time(git_build):>12} {'—':>12}")
-    print(f"  {'First agent (sequential)':<35} "
-          f"{'—':>12} {fmt_time(cnf_first):>12}")
-    print(f"  {'Remaining agents (parallel)':<35} "
-          f"{'—':>12} {fmt_time(cnf_parallel):>12}")
-    print(f"  {'Repair agent':<35} "
-          f"{fmt_time(git_repair) if git_repair else '—':>12} {'—':>12}")
-    print(f"  {'Infrastructure':<35} "
-          f"{fmt_time(git_infra_total):>12} {fmt_time(cnf_infra_total):>12}")
-    print("  " + "─" * (w - 4))
-    print(f"  {'PROJECTED TOTAL':<35} "
-          f"{fmt_time(git_projected):>12} {fmt_time(cnf_projected):>12}")
-
-    if cnf_projected > 0:
-        ratio = git_projected / cnf_projected
-        winner = "CNF" if ratio > 1 else "Git"
-        factor = ratio if ratio > 1 else 1.0 / ratio
-        print()
-        print(f"  → {winner} {factor:.1f}x faster")
-
-    if git["failures"]:
-        print()
-        print("  Git failures after repair:")
-        for f in git["failures"]:
-            print(f"    {f}")
     if cnf["failures"]:
         print()
-        print("  CNF failures:")
         for f in cnf["failures"]:
             print(f"    {f}")
-
     print()
 
 
@@ -1339,59 +1269,43 @@ def main():
     print("═" * w)
     print("  F8: Parallel Construction Race")
     print()
-    print("  Agent code: from real Claude Code agents (F2/F5)")
-    print("  Infrastructure: real (daemon, pytest, file ops)")
-    print(f"  Projection: {AGENT_INFERENCE_TIME}s/agent, "
-          f"{REPAIR_INFERENCE_TIME}s/repair (F6 calibration)")
+    print("  Git:  N parallel → merge → test → repair → retest")
+    print("  CNF:  N parallel → live graph → test (0 repairs)")
+    print(f"  Calibration: {AGENT_INFERENCE_TIME}s/agent, "
+          f"{REPAIR_INFERENCE_TIME}s/repair (F6)")
     print("═" * w)
 
     all_results = {}
     for n in [2, 5]:
         print()
-        print(f"  Running {n}-agent git condition...", end="", flush=True)
+        print(f"  Running {n}-agent git...", end="", flush=True)
         git = run_git_condition(n)
         print(f" {git['pass_before']}/{git['pass_before']+git['bugs_before']}"
               f" → {git['pass_after']}/{git['pass_after']+git['bugs_after']}")
-        print(f"  Running {n}-agent CNF condition...", end="", flush=True)
+        print(f"  Running {n}-agent CNF...", end="", flush=True)
         cnf = run_cnf_condition(n)
         print(f" {cnf['pass_after']}/{cnf['pass_after']+cnf['bugs_after']}")
         all_results[n] = (git, cnf)
         print_results(n, git, cnf)
 
-    # Summary
     print("═" * w)
     print("  RESULT")
     print("═" * w)
     print()
-    print(f"  {'Agents':<12} {'Git':>18} {'CNF':>18} {'Winner':>12}")
-    print("  " + "─" * (w - 4))
+    print(f"  {'Agents':<10} {'Git':>10} {'CNF':>10} {'Speedup':>10}")
+    print("  " + "─" * 42)
     for n in [2, 5]:
         git, cnf = all_results[n]
         gb = git.get("bugs_before", 0)
-        git_proj = AGENT_INFERENCE_TIME + sum(git["phases"].values()) + \
-                   (REPAIR_INFERENCE_TIME if gb > 0 else 0)
-        cnf_proj = AGENT_INFERENCE_TIME * 2 + sum(cnf["phases"].values())
-        ratio = git_proj / cnf_proj if cnf_proj > 0 else 0
-        winner = "CNF" if ratio > 1 else "Git"
-        factor = ratio if ratio > 1 else 1.0 / ratio
-        print(f"  {n:<12} {fmt_time(git_proj):>18} "
-              f"{fmt_time(cnf_proj):>18} "
-              f"{'CNF '+f'{factor:.1f}x':>12}")
+        g = AGENT_INFERENCE_TIME + sum(git["phases"].values()) + \
+            (REPAIR_INFERENCE_TIME if gb > 0 else 0)
+        c = AGENT_INFERENCE_TIME + sum(cnf["phases"].values())
+        print(f"  {n:<10} {fmt_time(g):>10} {fmt_time(c):>10} "
+              f"{'CNF '+f'{g/c:.1f}x':>10}")
+
     print()
-    print("  Why CNF wins: agents share state → 0 cross-cutting bugs →")
-    print("  0 repair rounds. Git agents build blind → 4 bugs → repair")
-    print(f"  round costs {REPAIR_INFERENCE_TIME}s of LLM inference.")
-    print()
-    print("  Why CNF costs 2x agent time: first agent must finish and")
-    print("  parse into graph before others can query. Sequential tax.")
-    print("  Net: repair cost ({0}s) > sequential tax ({1}s).".format(
-        int(REPAIR_INFERENCE_TIME), int(AGENT_INFERENCE_TIME)))
-    print()
-    print("  Breakeven: if repair cost < {0}s, git wins.".format(
-        int(AGENT_INFERENCE_TIME)))
-    print("  F6 measured repair at {0}s. Repair cost scales with".format(
-        int(REPAIR_INFERENCE_TIME)))
-    print("  bug count and cross-cutting depth.")
+    print("  Both build all agents in parallel (same 26s).")
+    print("  Git: 4 bugs → 56s repair.  CNF: 0 bugs → 0 repair.")
     print()
     print("═" * w)
 

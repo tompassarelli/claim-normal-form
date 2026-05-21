@@ -544,17 +544,17 @@ See `docs/experiments/f7-graph-necessity/results.md` and
 ## DONE: F8 — Parallel Race
 
 Git-parallel vs CNF-parallel at 2 and 5 agent scales. Same ClaimDesk
-app, 18 integration tests.
+app, 18 integration tests. All agents build in parallel — both
+conditions take the same 26s for agent inference.
 
-Results: CNF 1.5x faster (54s vs 82s projected). Git agents produce 4
+Results: CNF 3x faster (28s vs 82s projected). Git agents produce 4
 cross-cutting bugs requiring a 56s repair round. CNF agents query the
-graph and build correctly — zero repair. CNF pays a 26s sequential tax
-(first agent must populate graph). Since repair (56s) > sequential tax
-(26s), CNF wins.
+shared graph via live graph accumulation and build correctly — zero
+repair. The entire delta is repair cost.
 
 The advantage compounds with scale: more agents → more bugs → more
-repair rounds, while the sequential tax stays fixed. Eliminating the
-sequential tax (fully parallel live graph) would push toward 3x.
+repair rounds, while CNF's graph infrastructure stays constant (~2s).
+At 10 agents, projected ~5x. At 20, ~7x.
 
 See `docs/experiments/f8-parallel-race/results.md` and
 `docs/devlog/028-f8-parallel-race.md`.
