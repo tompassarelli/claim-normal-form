@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-05-21 14:45:42",
+  "agents": 6,
+  "git": {
+    "build_time": 22.170203417015728,
+    "test_time": 0.06588416500017047,
+    "repair_time": 149.21355598903028,
+    "total_time": 171.44964357104618,
+    "pass_before": 17,
+    "fail_before": 5,
+    "pass_after": 22,
+    "fail_after": 0,
+    "failures_before": [
+      "FAIL: test_09_create_triggers_audit: No audit entry for create",
+      "FAIL: test_11_archive_permission: Admin should have archive permission",
+      "FAIL: test_12_active_count_excludes_archived: Archived counted as active",
+      "FAIL: test_13_summary_has_all_statuses: Summary missing 'open': {'total': 0}",
+      "FAIL: test_14_unassigned_excludes_archived: Archived in unassigned list"
+    ],
+    "failures_after": [],
+    "agent_times": {
+      "audit": 7.243868985970039,
+      "escalation": 9.771276746003423,
+      "analytics": 9.89256328297779,
+      "comments": 13.668542750994675,
+      "permissions": 15.28011770703597,
+      "notifications": 22.166408023040276
+    },
+    "agent_tool_calls": {
+      "audit": 0,
+      "escalation": 0,
+      "analytics": 0,
+      "comments": 0,
+      "permissions": 0,
+      "notifications": 0
+    }
+  },
+  "cnf": {
+    "build_time": 29.505213192023803,
+    "test_time": 0.06722152000293136,
+    "repair_time": 174.67206056794384,
+    "total_time": 204.24449527997058,
+    "pass_before": 20,
+    "fail_before": 1,
+    "pass_after": 22,
+    "fail_after": 0,
+    "failures_before": [
+      "FAIL: test_09_create_triggers_audit: No audit entry for create",
+      "ERROR: test_11_archive_permission: ImportError: cannot import name 'has_permission' from 'permissions' (/tmp/f10-cnf-5p6xjw57/permissions.py)"
+    ],
+    "failures_after": [],
+    "agent_times": {
+      "audit": 10.058084026968572,
+      "comments": 11.352359655022155,
+      "escalation": 13.741047471994534,
+      "analytics": 21.795166730997153,
+      "notifications": 26.684968797955662,
+      "permissions": 29.504234099003952
+    },
+    "agent_tool_calls": {
+      "audit": 0,
+      "comments": 0,
+      "escalation": 0,
+      "analytics": 0,
+      "notifications": 0,
+      "permissions": 0
+    },
+    "total_mcp_calls": 0
+  }
+}

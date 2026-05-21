@@ -577,6 +577,27 @@ deterministic given the information gap — identical to F2/F8.
 See `docs/experiments/f9-real-race/results.md` and
 `docs/devlog/029-f9-real-race.md`.
 
+## DONE: F10 — Live Graph Race
+
+Real agents, live CNF daemon, graph-derived context from live queries.
+Six agents, 22 integration tests. Daemon runs on localhost with Python
+source parsed into the claim graph (1685 objects, 1130 claims, 11
+Datalog rules). Six MCP bridges connect simultaneously via lightweight
+Python bridge processes.
+
+Coordinator queries the live graph for entity names, types, and
+dependencies, formats 3357 chars of structural context. Same
+correctness result: 20/22 CNF vs 16.5/22 git (mean first-pass).
+Four information-gap bugs eliminated in every CNF run.
+
+Key finding: direct agent graph queries work technically (all bridges
+connect) but agents can't navigate the Datalog schema — they use wrong
+predicate names and get empty results. Coordinator-mediated context is
+the practical approach. Higher-level query tools are the next step.
+
+See `docs/experiments/f10-live-race/results.md` and
+`docs/devlog/030-f10-live-race.md`.
+
 ## LATER: BEAM Runtime
 
 CNF is the data model. Datalog is the reasoning layer. BEAM is the

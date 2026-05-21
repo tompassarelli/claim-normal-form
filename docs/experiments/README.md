@@ -34,6 +34,7 @@ a maintained semantic index than against text files.
 | F7 | Graph necessity | [results](f7-graph-necessity/results.md) | **18 modules, 49 tests, 7 edit sites. Same recall all 3 conditions (6/7, 86%). Graph precision 60% vs grep 35%. Graph 11 tool calls vs grep 35 (3.2x). The graph filters, it doesn't find.** |
 | F8 | Parallel race | [results](f8-parallel-race/results.md) | **Git-parallel vs CNF-parallel, 2 and 5 agents. Git 82s (build + repair). CNF 28s (all parallel, 0 repairs). CNF 3x faster. Repair cost (56s) is the entire delta.** |
 | F9 | Real parallel race | [results](f9-real-race/results.md) | **6 real Claude Sonnet agents, wall clock. Git 68s (build + 48s repair). CNF 34s (0 repairs). CNF 2x faster. Same 4 structural bugs as F2/F8, every run.** |
+| F10 | Live graph race | [results](f10-live-race/results.md) | **6 real agents, live CNF daemon. Graph-derived context from live queries. Git 16.5/22 first-pass, CNF 20/22. Same 4 info-gap bugs eliminated. Direct agent queries work technically but agents can't navigate Datalog schema yet.** |
 
 ## The arc
 
@@ -218,3 +219,14 @@ The same 4 structural bugs appear in every run — notifications fire for
 archived, admin lacks archive permission, analytics only counts open,
 escalation doesn't exclude archived. The bugs are deterministic given
 the information gap, not stochastic.
+
+F10 closed the infrastructure loop. A live CNF daemon runs on localhost,
+Python source is parsed into the claim graph (1685 objects, 1130 claims),
+and six MCP bridges connect simultaneously via lightweight Python bridge
+processes. The coordinator queries the live graph for entity names and
+dependencies, formats 3357 chars of structural context, and injects it
+into agent prompts. Same correctness result: 20/22 CNF vs 16.5/22 git
+(mean first-pass). The four information-gap bugs are eliminated. Direct
+agent graph queries work technically (all bridges connect) but agents
+can't navigate the Datalog schema effectively — the coordinator-mediated
+pattern is the practical approach for now.

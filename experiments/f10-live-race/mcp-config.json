@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cnf": {
+      "command": "/run/current-system/sw/bin/python3",
+      "args": [
+        "/home/tom/code/cnf-racket/experiments/f10-live-race/cnf-bridge.py",
+        "7891"
+      ]
+    }
+  }
+}

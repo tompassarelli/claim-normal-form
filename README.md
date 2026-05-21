@@ -202,6 +202,12 @@ is untouched.
   clock measured. Git 68s (build + 48s repair). CNF 34s (build,
   0 repairs). **CNF 2x faster.** Same 4 structural bugs as F2/F8,
   every run. The prediction holds with real LLM inference.
+- **F10**: Live graph race. Real agents, live CNF daemon, graph-derived
+  context from live queries (1685 objects, 1130 claims, 6 simultaneous
+  MCP bridges). **Same 4 info-gap bugs eliminated.** Git 16.5/22
+  first-pass, CNF 20/22. Direct agent queries work technically but
+  agents can't navigate Datalog schema — coordinator-mediated context
+  is the practical path.
 
 See the full [experiment arc](docs/experiments/README.md).
 
@@ -298,7 +304,7 @@ Claude Code MCP configuration (`.claude/settings.json`):
 | **[Language bridges](docs/bridges.md)** | Racket, Python, and Beagle bridges, adding new languages |
 | **[Performance](docs/performance.md)** | Benchmarks, honest limitations |
 | **[Specification](specification.md)** | Full formal spec |
-| **[Experiments](docs/experiments/)** | 28 experiments (E1–E19, F2–F9) with raw results |
+| **[Experiments](docs/experiments/)** | 29 experiments (E1–E19, F2–F10) with raw results |
 | **[Devlog](docs/devlog/)** | 28 entries — discoveries, direction changes, honest numbers |
 | **[Roadmap](docs/todo.md)** | What's done, what's next |
 
@@ -323,6 +329,13 @@ timing: all agents in parallel, **CNF 3x faster** (28s vs 82s).
 F9 confirmed with real Claude Sonnet agents: **CNF 2x faster**
 (34s vs 68s mean across two runs). Same 4 structural bugs every
 run — the prediction from F2/F8 holds with real LLM inference.
+
+F10 closed the infrastructure loop: a live CNF daemon serving
+graph-derived context to six agents via MCP bridges. Same
+correctness result (20/22 CNF vs 16.5/22 git first-pass), now
+from live queries against a 1685-object graph. Direct agent graph
+queries work technically but agents can't navigate the Datalog
+schema — higher-level query tools are the next interface step.
 
 F7 tested whether the semantic graph itself is necessary (vs. just
 reading files). The graph's value is precision (60% vs 35%) and
