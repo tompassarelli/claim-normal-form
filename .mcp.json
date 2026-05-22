@@ -2,7 +2,7 @@
   "mcpServers": {
     "cnf": {
       "command": "racket",
-      "args": ["/home/tom/code/cnf-racket/mcp-server.rkt"]
+      "args": ["/home/tom/code/cnf-racket/cnf-lib/server.rkt"]
     }
   }
 }
