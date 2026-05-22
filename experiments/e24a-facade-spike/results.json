@@ -1,0 +1,295 @@
+{
+  "timestamp": "2026-05-22 15:06:39",
+  "experiment": "E24a-multi",
+  "condition": "no_graph",
+  "num_runs": 5,
+  "runs": [
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 20.0,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.1061,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        },
+        "notifications": {
+          "elapsed": 20.3,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.0959,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        }
+      },
+      "tests": {
+        "test_02_no_notify_for_archived": "fail",
+        "test_03_active_count_excludes_archived": "fail",
+        "test_05_unassigned_excludes_archived": "fail",
+        "test_06_notify_uses_workflow_import": "fail",
+        "test_01": "pass",
+        "test_04": "pass"
+      },
+      "info_gap_total": "3/4",
+      "info_gap_bugs": 3,
+      "build_time": 20.3
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 10.4,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": true
+          },
+          "turns": 1,
+          "cost": 0.0137,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        },
+        "notifications": {
+          "elapsed": 38.2,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.0427,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 1
+        }
+      },
+      "tests": {
+        "test_01_notify_on_transition": "fail",
+        "test_03_active_count_excludes_archived": "fail",
+        "test_05_unassigned_excludes_archived": "fail",
+        "test_06_notify_uses_workflow_import": "fail",
+        "test_02": "pass",
+        "test_04": "pass"
+      },
+      "info_gap_total": "2/4",
+      "info_gap_bugs": 2,
+      "build_time": 38.2
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 12.0,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": true
+          },
+          "turns": 1,
+          "cost": 0.0153,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        },
+        "notifications": {
+          "elapsed": 29.6,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.035,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        }
+      },
+      "tests": {
+        "test_02_no_notify_for_archived": "fail",
+        "test_03_active_count_excludes_archived": "fail",
+        "test_05_unassigned_excludes_archived": "fail",
+        "test_06_notify_uses_workflow_import": "fail",
+        "test_01": "pass",
+        "test_04": "pass"
+      },
+      "info_gap_total": "3/4",
+      "info_gap_bugs": 3,
+      "build_time": 29.6
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 19.1,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 2,
+          "cost": 0.0284,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        },
+        "notifications": {
+          "elapsed": 35.7,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.0323,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 1
+        }
+      },
+      "tests": {
+        "test_03_active_count_excludes_archived": "fail",
+        "test_05_unassigned_excludes_archived": "fail",
+        "test_06_notify_uses_workflow_import": "fail",
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_04": "pass"
+      },
+      "info_gap_total": "2/4",
+      "info_gap_bugs": 2,
+      "build_time": 35.7
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 16.5,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.0205,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 2
+        },
+        "notifications": {
+          "elapsed": 33.5,
+          "tool_calls": [],
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.0346,
+          "denials": [],
+          "error": null,
+          "info_gap_bugs": 1
+        }
+      },
+      "tests": {
+        "test_01_notify_on_transition": "fail",
+        "test_03_active_count_excludes_archived": "fail",
+        "test_05_unassigned_excludes_archived": "fail",
+        "test_06_notify_uses_workflow_import": "fail",
+        "test_02": "pass",
+        "test_04": "pass"
+      },
+      "info_gap_total": "2/4",
+      "info_gap_bugs": 2,
+      "build_time": 33.5
+    }
+  ],
+  "aggregate": {
+    "total_bugs": 12,
+    "total_opportunities": 20,
+    "failure_rate": 0.6,
+    "per_run_bugs": [
+      3,
+      2,
+      3,
+      2,
+      2
+    ]
+  }
+}

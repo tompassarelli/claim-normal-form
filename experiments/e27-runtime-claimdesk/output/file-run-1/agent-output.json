@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 90125,
+  "duration_api_ms": 90859,
+  "num_turns": 12,
+  "result": "Everything looks correct. Here's a summary of all changes made:\n\n**workflow.py**\n- `VALID_TRANSITIONS`: added `\"duplicate\"` as a target from `\"open\"` and `\"in_progress\"`, and added `\"duplicate\": []` (no exits, terminal)\n- `TERMINAL_STATUSES`: added `\"duplicate\"` \u2014 this automatically propagates to `ALL_STATUSES`, and to both `notifications.py` and `analytics.py` (which import `TERMINAL_STATUSES`)\n- Added `mark_duplicate_ticket()` \u2014 validated transition via the state machine\n- Added `is_duplicate()` predicate, matching the pattern of `is_archived()`\n\n**core.py**\n- Added `mark_duplicate()` \u2014 direct status update, matching the pattern of `close_ticket()`\n\n**permissions.py**\n- Added `\"duplicate\": {\"agent\", \"admin\"}` \u2014 agents and admins can mark tickets as duplicate (less restrictive than `archive` which is admin-only, since duplicate is a routine triage action)",
+  "stop_reason": "end_turn",
+  "session_id": "cdae7e0d-ac82-4f6a-8c16-229d152f811b",
+  "total_cost_usd": 0.25498394999999996,
+  "usage": {
+    "input_tokens": 9,
+    "cache_creation_input_tokens": 16357,
+    "cache_read_input_tokens": 181742,
+    "output_tokens": 3662,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 16357,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 245,
+        "cache_read_input_tokens": 26897,
+        "cache_creation_input_tokens": 655,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 655
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 502,
+      "outputTokens": 3350,
+      "cacheReadInputTokens": 223661,
+      "cacheCreationInputTokens": 35638,
+      "webSearchRequests": 0,
+      "costUSD": 0.08416560000000001,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 9,
+      "outputTokens": 3662,
+      "cacheReadInputTokens": 181742,
+      "cacheCreationInputTokens": 16357,
+      "webSearchRequests": 0,
+      "costUSD": 0.17081834999999998,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "bbd149fb-85d2-45d6-853b-cc0bab570b13"
+}

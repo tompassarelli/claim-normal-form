@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "cnf-facade": {
+      "command": "/run/current-system/sw/bin/python3",
+      "args": [
+        "/home/tom/code/cnf-racket/experiments/e24a-facade-spike/facade-tools.py",
+        "7891",
+        "--exclude",
+        "discover_lifecycle"
+      ]
+    }
+  }
+}

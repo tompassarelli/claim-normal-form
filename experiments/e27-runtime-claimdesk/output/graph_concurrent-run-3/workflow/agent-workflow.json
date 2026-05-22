@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 25959,
+  "duration_api_ms": 27420,
+  "num_turns": 11,
+  "result": "Done. Summary of changes:\n\n- Added `suspended` as a **blocked** (non-active, non-terminal) status\n- Transitions **in**: `in_progress \u2192 suspended`, `on_hold \u2192 suspended`\n- Transitions **out**: `suspended \u2192 in_progress` (resume), `suspended \u2192 closed` (close directly)\n- No path from `suspended` back to `on_hold` or forward to `resolved` \u2014 keeps it unambiguous\n- Workflow obligations pass cleanly; all 4 modules projected",
+  "stop_reason": "end_turn",
+  "session_id": "30911776-e41f-450e-94a4-745670fa932c",
+  "total_cost_usd": 0.06596824999999999,
+  "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 1393,
+    "cache_read_input_tokens": 155475,
+    "output_tokens": 893,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 1393,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 119,
+        "cache_read_input_tokens": 22910,
+        "cache_creation_input_tokens": 132,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 132
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 598,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000683,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 8,
+      "outputTokens": 893,
+      "cacheReadInputTokens": 155475,
+      "cacheCreationInputTokens": 1393,
+      "webSearchRequests": 0,
+      "costUSD": 0.06528525,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "847a3631-9143-4ab3-b5c5-31421bee2b92"
+}

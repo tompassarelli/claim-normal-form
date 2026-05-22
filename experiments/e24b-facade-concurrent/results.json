@@ -1,0 +1,255 @@
+{
+  "timestamp": "2026-05-22 15:38:02",
+  "experiment": "E24b",
+  "condition": "cnf",
+  "num_runs": 3,
+  "runs": [
+    {
+      "agents": {
+        "permissions": {
+          "elapsed": 18.6,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.1077,
+          "error": null
+        },
+        "analytics": {
+          "elapsed": 20.2,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": true,
+            "uses_is_active": true,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 5,
+          "cost": 0.1158,
+          "error": null
+        },
+        "notifications": {
+          "elapsed": 39.6,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 4,
+          "cost": 0.138,
+          "error": null
+        }
+      },
+      "tests": {
+        "test_06_no_manage_archived": "fail",
+        "test_07_notifications_imports_workflow": "fail",
+        "test_08_permissions_imports_workflow": "fail",
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass"
+      },
+      "info_gap_total": "3/8",
+      "info_gap_bugs": 3,
+      "repair_rounds": 0,
+      "build_time": 39.6,
+      "first_pass_info_gap": null
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 13.5,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": true,
+            "uses_is_active": true,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 6,
+          "cost": 0.0393,
+          "error": null
+        },
+        "permissions": {
+          "elapsed": 14.0,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 1,
+          "cost": 0.0187,
+          "error": null
+        },
+        "notifications": {
+          "elapsed": 25.0,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.0381,
+          "error": null
+        }
+      },
+      "tests": {
+        "test_06_no_manage_archived": "fail",
+        "test_07_notifications_imports_workflow": "fail",
+        "test_08_permissions_imports_workflow": "fail",
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass"
+      },
+      "info_gap_total": "3/8",
+      "info_gap_bugs": 3,
+      "repair_rounds": 0,
+      "build_time": 25.0,
+      "first_pass_info_gap": null
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 13.5,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": true,
+            "uses_is_active": true,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 5,
+          "cost": 0.0408,
+          "error": null
+        },
+        "permissions": {
+          "elapsed": 22.5,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.0349,
+          "error": null
+        },
+        "notifications": {
+          "elapsed": 39.0,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": false,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 6,
+          "cost": 0.0708,
+          "error": null
+        }
+      },
+      "tests": {
+        "test_06_no_manage_archived": "fail",
+        "test_07_notifications_imports_workflow": "fail",
+        "test_08_permissions_imports_workflow": "fail",
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass"
+      },
+      "info_gap_total": "3/8",
+      "info_gap_bugs": 3,
+      "repair_rounds": 0,
+      "build_time": 39.0,
+      "first_pass_info_gap": null
+    }
+  ],
+  "aggregate": {
+    "total_bugs": 9,
+    "total_opportunities": 24,
+    "failure_rate": 0.375,
+    "per_run_bugs": [
+      3,
+      3,
+      3
+    ],
+    "first_pass_bugs": [
+      3,
+      3,
+      3
+    ],
+    "first_pass_failure_rate": 0.375
+  }
+}

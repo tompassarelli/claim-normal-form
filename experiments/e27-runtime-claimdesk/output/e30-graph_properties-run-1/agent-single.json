@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 56831,
+  "duration_api_ms": 58083,
+  "num_turns": 26,
+  "result": "Done. Here's a summary of everything that was added:\n\n**Status**\n- `suspended` \u2014 blocked group (not active work, not terminal)\n\n**Transitions** (4 new)\n- `in_progress \u2192 suspended`\n- `on_hold \u2192 suspended`\n- `suspended \u2192 in_progress` (resume)\n- `suspended \u2192 closed` (close without reopening)\n\n**Permissions** (4 new)\n- `suspend`: agent, admin\n- `resume`: agent, admin\n\n**Effects** (2 new)\n- `transition/notification` when condition=blocked\n- `transition/analytics` when condition=blocked (tagged separately from active transitions)\n\nThe graph enforces all the business rules \u2014 `suspended` sits in the `blocked` group, so it is excluded from active workload counts automatically, and the obligation checker confirmed every module is clean before projecting.",
+  "stop_reason": "end_turn",
+  "session_id": "62928501-852f-4bd0-8798-2a649d04d01a",
+  "total_cost_usd": 0.1177251,
+  "usage": {
+    "input_tokens": 11,
+    "cache_creation_input_tokens": 3480,
+    "cache_read_input_tokens": 232427,
+    "output_tokens": 2285,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 3480,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 197,
+        "cache_read_input_tokens": 25112,
+        "cache_creation_input_tokens": 135,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 135
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 559,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000639,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 11,
+      "outputTokens": 2285,
+      "cacheReadInputTokens": 232427,
+      "cacheCreationInputTokens": 3480,
+      "webSearchRequests": 0,
+      "costUSD": 0.1170861,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "050dd93b-cb12-4a40-ab93-541b0e3187d2"
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cnf-facade": {
+      "command": "/run/current-system/sw/bin/python3",
+      "args": [
+        "/home/tom/code/cnf-racket/experiments/e25-obligation-repair/facade-tools.py",
+        "7893"
+      ]
+    }
+  }
+}

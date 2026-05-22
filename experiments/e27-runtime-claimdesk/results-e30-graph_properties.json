@@ -1,0 +1,127 @@
+{
+  "timestamp": "2026-05-22T19:53:17",
+  "experiment": "E30",
+  "condition": "graph_properties",
+  "num_runs": 3,
+  "runs": [
+    {
+      "run_id": "run-1",
+      "elapsed": 59.43942618370056,
+      "cost": 0.1177251,
+      "turns": 26,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "Done. Here's a summary of everything that was added:\n\n**Status**\n- `suspended` \u2014 blocked group (not active work, not terminal)\n\n**Transitions** (4 new)\n- `in_progress \u2192 suspended`\n- `on_hold \u2192 suspended`\n- `suspended \u2192 in_progress` (resume)\n- `suspended \u2192 closed` (close without reopening)\n\n**Permiss",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 17,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 17, failed 0, errors 0\n"
+    },
+    {
+      "run_id": "run-2",
+      "elapsed": 39.518845081329346,
+      "cost": 0.100716,
+      "turns": 26,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "Done. Here's what was added:\n\n**Status:** `suspended` \u2014 blocked group (not active work, not terminal)\n\n**Transitions (4):**\n- `in_progress` \u2192 `suspended`\n- `on_hold` \u2192 `suspended`\n- `suspended` \u2192 `in_progress` (resume)\n- `suspended` \u2192 `closed` (direct close)\n\n**Permissions:** `suspend` and `resume` ",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 17,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 17, failed 0, errors 0\n"
+    },
+    {
+      "run_id": "run-3",
+      "elapsed": 50.00995898246765,
+      "cost": 0.1097487,
+      "turns": 26,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "Done. Here's a summary of every change made to the graph:\n\n**Status added**\n- `suspended` \u2014 blocked group (not active work, not terminal)\n\n**Transitions added**\n- `in_progress \u2192 suspended` (pause active work)\n- `on_hold \u2192 suspended` (freeze held work)\n- `suspended \u2192 in_progress` (resume)\n- `suspende",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 17,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 17, failed 0, errors 0\n"
+    }
+  ],
+  "aggregate": {
+    "total_structural_bugs": 0,
+    "total_obligation_bugs": 0,
+    "structural_opportunities": 27,
+    "obligation_opportunities": 24,
+    "mean_elapsed": 49.656076749165855,
+    "mean_cost": 0.1093966
+  }
+}

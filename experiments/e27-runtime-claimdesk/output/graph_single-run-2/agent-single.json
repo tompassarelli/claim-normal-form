@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 91111,
+  "duration_api_ms": 92024,
+  "num_turns": 29,
+  "result": "Done. Here's a summary of every change made to the graph:\n\n**Status added**\n- `suspended` \u2014 group `blocked` (not active, not terminal)\n\n**Transitions added** (4 edges)\n- `in_progress \u2192 suspended`\n- `on_hold \u2192 suspended`\n- `suspended \u2192 in_progress` (resume)\n- `suspended \u2192 closed` (direct close)\n\n**Permissions added**\n- `suspend` \u2192 `agent`, `admin`\n- `resume` \u2192 `agent`, `admin`\n\n**Effects added**\n- `transition / notification / blocked` \u2014 notifications fire on blocked-status transitions (separately from the existing `not-terminal` rule)\n- `transition / analytics / blocked` \u2014 analytics tags blocked transitions separately from active ones\n\nAll 4 modules projected to `output/graph_single-run-2/projected/`. Workflow and permissions obligations are fully clean; the notifications and analytics obligations are structural reminders that the `blocked` condition effects need to be wired into the runtime handlers, which the graph-projected code now imports `BLOCKED_STATUSES` to support.",
+  "stop_reason": "end_turn",
+  "session_id": "da0e321a-26d9-4a52-95bc-c5a8d8b10f15",
+  "total_cost_usd": 0.1781208,
+  "usage": {
+    "input_tokens": 13,
+    "cache_creation_input_tokens": 6212,
+    "cache_read_input_tokens": 283076,
+    "output_tokens": 4615,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 6212,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 249,
+        "cache_read_input_tokens": 26358,
+        "cache_creation_input_tokens": 1464,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1464
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 559,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000639,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 13,
+      "outputTokens": 4615,
+      "cacheReadInputTokens": 283076,
+      "cacheCreationInputTokens": 6212,
+      "webSearchRequests": 0,
+      "costUSD": 0.1774818,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "bcc78083-092a-4013-9d93-c88ab8ccbe70"
+}

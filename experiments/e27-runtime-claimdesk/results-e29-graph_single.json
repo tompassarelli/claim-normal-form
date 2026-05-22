@@ -1,0 +1,124 @@
+{
+  "timestamp": "2026-05-22T18:53:18",
+  "experiment": "E29",
+  "condition": "graph_single",
+  "num_runs": 3,
+  "runs": [
+    {
+      "run_id": "run-1",
+      "elapsed": 33.525964975357056,
+      "cost": 0.060693449999999996,
+      "turns": 15,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "fail",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "fail",
+        "test_10": "fail",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "fail",
+        "test_14": "fail",
+        "test_15": "fail",
+        "test_16": "fail",
+        "test_17": "pass"
+      },
+      "passed": 10,
+      "total": 17,
+      "structural_bugs": 1,
+      "obligation_bugs": 6,
+      "raw_output": "PASS: test_01\nFAIL: test_02 ACTIVE_STATUSES=['on_hold', 'in_progress', 'suspended', 'open']\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nFAIL: test_09 BLOCKED_STATUSES not defined in workflow\nFAIL: test_10 is_blocked not defined in workflow\nPASS: test_11\nPASS: test_12\nFAIL: test_13 expected 2 active, got 3\nFAIL: test_14 event={'ticket': 't1', 'from': 'in_progress', 'to': 'suspended', 'is_terminal': False}\nFAIL: test_15 PERMISSION_RULES keys=['archive', 'manage']\nFAIL: test_16 PERMISSION_RULES keys=['archive', 'manage']\nPASS: test_17\n\npassed 10, failed 7, errors 0\n"
+    },
+    {
+      "run_id": "run-2",
+      "elapsed": 93.77423453330994,
+      "cost": 0.1781208,
+      "turns": 29,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "fail",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 16,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 1,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nFAIL: test_14 event={'ticket': 't1', 'from': 'in_progress', 'to': 'suspended', 'is_terminal': False}\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 16, failed 1, errors 0\n"
+    },
+    {
+      "run_id": "run-3",
+      "elapsed": 158.6069986820221,
+      "cost": 0.38417749999999995,
+      "turns": 55,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 17,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 17, failed 0, errors 0\n"
+    }
+  ],
+  "aggregate": {
+    "total_structural_bugs": 1,
+    "total_obligation_bugs": 7,
+    "structural_opportunities": 27,
+    "obligation_opportunities": 24,
+    "mean_elapsed": 95.30239939689636,
+    "mean_cost": 0.20766391666666664
+  }
+}

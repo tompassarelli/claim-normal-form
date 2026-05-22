@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 73176,
+  "duration_api_ms": 74242,
+  "num_turns": 13,
+  "result": "Everything looks correct. Here's a summary of all changes made:\n\n**`workflow.py`**\n- Added `\"duplicate\"` to `VALID_TRANSITIONS` for `\"open\"` and `\"in_progress\"` (the two allowed source states)\n- Added `\"duplicate\": []` entry (no exits \u2014 it's terminal)\n- Added `\"duplicate\"` to `TERMINAL_STATUSES`\n- Added `is_duplicate(ticket)` helper alongside `is_archived`\n\n**`core.py`**\n- Added `mark_duplicate(ticket_id)` convenience function alongside `close_ticket`\n\nThe three auto-generated modules (`notifications.py`, `analytics.py`, `permissions.py`) all import `TERMINAL_STATUSES` from `workflow`, so they pick up `\"duplicate\"` automatically \u2014 no changes needed there. Notifications are suppressed, analytics records it as terminal, and `ALL_STATUSES` grows via `ACTIVE_STATUSES + TERMINAL_STATUSES`.",
+  "stop_reason": "end_turn",
+  "session_id": "b9ab5369-33eb-42c9-8a9c-8145510d33dc",
+  "total_cost_usd": 0.19415030000000003,
+  "usage": {
+    "input_tokens": 9,
+    "cache_creation_input_tokens": 16175,
+    "cache_read_input_tokens": 175331,
+    "output_tokens": 2560,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 16175,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 232,
+        "cache_read_input_tokens": 25608,
+        "cache_creation_input_tokens": 1762,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1762
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 497,
+      "outputTokens": 2642,
+      "cacheReadInputTokens": 184170,
+      "cacheCreationInputTokens": 8275,
+      "webSearchRequests": 0,
+      "costUSD": 0.04246775,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 9,
+      "outputTokens": 2560,
+      "cacheReadInputTokens": 175331,
+      "cacheCreationInputTokens": 16175,
+      "webSearchRequests": 0,
+      "costUSD": 0.15168255,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "34d20da3-727e-412b-9cbd-5af662a0a10b"
+}

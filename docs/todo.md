@@ -789,6 +789,199 @@ fresh connection.
 See `experiments/e23-concurrent-agents/` and
 `docs/experiments/e23-concurrent-agents/results.md`.
 
+### DONE: E24a — Facade Design Spike (with E24a-multi replication)
+
+Semantic facade tools reliably eliminate info-gap bugs. 5 runs per
+condition, 20 info-gap test opportunities each:
+
+```
+facade_full:   0/20  (0% failure)   $0.135/run
+facade_basic:  0/20  (0% failure)   $0.133/run
+no_graph:     12/20  (60% failure)  $0.085/run
+```
+
+Analytics imported from workflow in 10/10 facade runs, 0/5 no-graph.
+Ablation: discover_lifecycle is NOT load-bearing — basic discover
+tools suffice. Directive tool descriptions eliminated earlier variance.
+
+Infrastructure: must disable built-in tools (`--tools ""`), must
+whitelist MCP tools (`--allowedTools`), test assertions must be
+key-agnostic.
+
+Scope: `docs/experiments/e24a-facade-spike/scope.md`.
+Results: `docs/experiments/e24a-facade-spike/results.md`.
+Data: `experiments/e24a-facade-spike/results-multi.json`.
+
+### DONE: E24b — Concurrent Facade Agents (3 agents, CNF vs file)
+
+Combines E24a (facade discovery) + E23b (concurrent composition).
+3 agents (notifications, analytics, permissions) build ClaimDesk
+modules simultaneously. Two conditions: CNF (shared daemon, facade
+tools) vs file (full source access + repair agent).
+
+```
+cnf (6 runs):    9/24 info-gap  (38% failure)   $0.156/run
+file first pass: 11/24          (46%)
+file + repair:   1/24           (4%)             $0.293/run
+```
+
+The permissions agent never engages with facade tools — its task
+("access control") is semantically distant from the tool descriptions
+("states, statuses, transitions"). Analytics reliably discovers via
+the facade (5/6 imports). The tool description update (adding
+"permissions, access control") had no effect.
+
+Key finding: file + repair outperforms CNF without repair on final
+score. Both conditions have similar first-pass rates (38% vs 46%).
+The repair agent is the file condition's structural advantage.
+
+Next: either mandatory discovery, task-aware meta-tools, or CNF
+repair mechanism.
+
+Scope: `docs/experiments/e24b-facade-concurrent/scope.md`.
+Results: `docs/experiments/e24b-facade-concurrent/results.md`.
+
+### DONE: E25 — Graph-Native Repair Loop
+
+finish_check + obligation repair. Same E24b setup, new condition:
+cnf_repair (facade + finish_check + repair loop).
+
+```
+cnf_repair:   1/24  (4%)   $0.142/run   1 repair round
+cnf_facade:   9/24  (38%)  $0.156/run   0 rounds (E24b)
+file_repair:  1/24  (4%)   $0.293/run   1 round (E24b)
+```
+
+finish_check solved the permissions problem: 0/6 imports_workflow
+(E24b) to 3/3 (E25). Same correctness as file + repair at half the
+cost. The graph catches what agents miss when they don't explore.
+
+Scope: `docs/experiments/e25-obligation-repair/scope.md`.
+Results: `docs/experiments/e25-obligation-repair/results.md`.
+
+### DEFERRED: E25c — Obligation Ablation
+
+Would test whether finish_check is "just a better prompt" by comparing
+against a static checklist. Valid question, but the semantic-index
+line is a completed side branch. The ablation objection doesn't matter
+if we're pivoting to graph-eval runtime.
+
+### DEFERRED: E26 — Single-Agent Codebase Management (semantic index)
+
+Would test CNF-as-index for single-agent large-codebase management.
+Deferred because it continues the semantic-index path, which puts
+CNF in the same arena as Sourcegraph/Cursor/LSPs/tree-sitter.
+
+### DONE: E27 — Graph-Native ClaimDesk (Runtime Vertical Slice)
+
+The claim graph IS the program. ClaimDesk domain model expressed
+entirely as CNF claims — statuses, transitions, roles, permissions,
+effects, tickets, users. No parsed Python. No file source of truth.
+
+Full pipeline working end to end:
+- **Domain claims**: 6 statuses, 9 transitions, 2 roles, 3 permissions,
+  2 effects, all as entities with predicate-linked claims
+- **Executable behavior**: can-transition? validates paths, check-permission
+  enforces role gates, transition-ticket! supersedes status links
+- **Obligation checker**: structural queries over claims (terminal gates,
+  archive permission existence)
+- **Projection**: project-workflow-py and project-permissions-py emit
+  valid Python from the graph
+- **The "add duplicate" test**: 3 claims → terminal-statuses returns 4,
+  new transitions validate, projection emits updated Python automatically
+
+13 rackunit tests. Demo script exercises the full pipeline.
+
+See `experiments/e27-runtime-claimdesk/` and
+`docs/devlog/045-e27-graph-native-claimdesk.md`.
+
+### DONE: E28 — Agent-Driven Graph Editing
+
+Head-to-head: graph-native agent (MCP tools) vs file-native agent
+(Python files). Task: "add duplicate as terminal status." 3 runs each.
+
+```
+graph:  0/36 bugs   30.5s mean   $0.067/run
+file:   0/36 bugs   71.8s mean   $0.199/run
+```
+
+Both 100% correct at this scale. Graph is 2.4x faster, 3x cheaper.
+No info-gap bugs because the codebase is small enough for the file
+agent to fully comprehend. The structural guarantee matters at scale.
+
+See `experiments/e27-runtime-claimdesk/` and
+`docs/devlog/045-e27-graph-native-claimdesk.md`.
+
+### DONE: E29 — Obligation Pressure (Semantic Commitment Amplifier)
+
+Task: add "suspended" (blocked group) — breaks the binary active/terminal
+partition. 4 conditions (graph/file × single/concurrent), 3 runs each.
+17 tests (9 structural + 8 cross-domain obligation).
+
+Core finding: in 6/6 file runs, zero agents introduced BLOCKED_STATUSES
+or is_blocked(). They patched suspended as an ad-hoc exception. The
+missing abstraction was implied by the business rule but absent from
+the code surface.
+
+Graph agents, when they classified correctly (4/6), got downstream
+obligations for free through projection. But in 2/6 runs they
+classified "suspended" as "active", and the graph amplified the wrong
+abstraction globally. The graph is a semantic commitment amplifier:
+correct classification → downstream correctness, wrong classification
+→ downstream catastrophe.
+
+Not a clean speed/cost win — file is faster and cheaper. The finding
+is narrower and stronger: graph externalizes missing structural
+consequences but shifts failure to the classification step.
+
+See `docs/experiments/e27-runtime-claimdesk/results-e29.md`.
+
+### DONE: E30 — Semantic Authority Transfer
+
+Moved classification authority from agent into graph. Agent declares
+business properties (counts_as_work, terminal); graph derives structural
+group. Effect vocabulary fix accepts group names as valid conditions.
+
+`graph_properties` achieved 0/24 obligation bugs at $0.109/run. All
+graph conditions: 0/72 obligation bugs. File baseline: 14/24, never
+creates BLOCKED_STATUSES or is_blocked(). The property-derived interface
+structurally eliminates misclassification — there is no group parameter
+to get wrong.
+
+Design principle: agents declare semantic properties; the graph derives
+internal classification. Don't make the agent pick ontology labels.
+
+See `docs/experiments/e27-runtime-claimdesk/results-e30.md`.
+
+### NOW: Typed effect constructors
+
+The "blocked" / "tag-blocked" fix is enough for E30, but stringly-typed
+effect conditions are a remaining source of fragility. Replace with
+typed constructors before the next experiment.
+
+### NEXT: E31 — Novel Group Synthesis
+
+Test whether property-derived classification generalizes beyond the
+three-group model. Task: add "escalated" tickets — still active work,
+requires manager visibility, changes SLA timers, triggers urgent
+notifications, affects analytics differently, can be de-escalated.
+
+The graph must either derive a new group or derive a subtype/tag
+layered over an existing group. Tests whether the design principle
+from E30 compounds.
+
+### NEXT: E32 — Multi-Entity Feature
+
+Feature that touches more than statuses: new role + new permissions +
+new effects + new workflow semantics. Tests whether CNF can coordinate
+multiple concept types, not just status classification.
+
+### NEXT: E33 — Real App Projection
+
+The projected Python passes integration tests, but no one is running
+it as a live application. Test whether the graph-projected artifact
+actually serves requests.
+
 ### OPEN: Totality as a per-node queryable property
 
 Fuel is scaffold. It answers "can the evaluator avoid hanging?" not

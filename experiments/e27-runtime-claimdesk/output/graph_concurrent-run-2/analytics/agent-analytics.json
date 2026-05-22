@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 112257,
+  "duration_api_ms": 113220,
+  "num_turns": 12,
+  "result": "Done. Here's what I added and why:\n\n**`workload-change` analytics effect** \u2014 The existing `always` analytics fires on every transition but is silent about whether a transition affects active workload. `suspended` sits outside the `active` group (not being worked on) but also outside `terminal` (not closed). The `workload-change` condition makes it explicit that any analytics pipeline consuming these events must update workload counters \u2014 decrement when entering suspended, increment when resuming. Without this, the `always` effect gives raw event data but nothing signals \"this ticket is no longer in your workload.\"\n\n**`to-terminal-from-non-active` notification effect** \u2014 The existing `not-terminal` notification fires for transitions whose *target* is non-terminal. That means `suspended \u2192 closed` (closed is terminal) falls through with no notification at all. Stakeholders following a suspended ticket need to know when it gets directly closed rather than resumed. This effect covers that gap without broadening the original `not-terminal` rule.\n\nBoth effects are additive \u2014 they don't change existing notification or analytics behavior for any other status.",
+  "stop_reason": "end_turn",
+  "session_id": "57f77acc-0125-49e2-8b16-bd15532fb99e",
+  "total_cost_usd": 0.16468119999999997,
+  "usage": {
+    "input_tokens": 10,
+    "cache_creation_input_tokens": 5532,
+    "cache_read_input_tokens": 220314,
+    "output_tokens": 5140,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 5532,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 249,
+        "cache_read_input_tokens": 27069,
+        "cache_creation_input_tokens": 131,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 131
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 617,
+      "outputTokens": 19,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.0007120000000000001,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 10,
+      "outputTokens": 5140,
+      "cacheReadInputTokens": 220314,
+      "cacheCreationInputTokens": 5532,
+      "webSearchRequests": 0,
+      "costUSD": 0.16396919999999998,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "6c2079c9-014c-4c3f-b6a4-06e9236f82cb"
+}

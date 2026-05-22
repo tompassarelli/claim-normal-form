@@ -1,0 +1,122 @@
+{
+  "timestamp": "2026-05-22T19:07:42",
+  "experiment": "E29",
+  "condition": "graph_concurrent",
+  "num_runs": 3,
+  "runs": [
+    {
+      "run_id": "run-1",
+      "elapsed": 54.90685725212097,
+      "cost": 0.153444,
+      "turns": 21,
+      "modules_produced": [
+        "workflow",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "fail",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "fail",
+        "test_10": "fail",
+        "test_11": "fail",
+        "test_12": "fail",
+        "test_13": "fail",
+        "test_14": "fail",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 10,
+      "total": 17,
+      "structural_bugs": 1,
+      "obligation_bugs": 6,
+      "raw_output": "PASS: test_01\nFAIL: test_02 ACTIVE_STATUSES=['on_hold', 'open', 'suspended', 'in_progress']\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nFAIL: test_09 BLOCKED_STATUSES not defined in workflow\nFAIL: test_10 is_blocked not defined in workflow\nFAIL: test_11 notifications module not found\nFAIL: test_12 notifications module not found\nFAIL: test_13 analytics module not found\nFAIL: test_14 analytics module not found\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 10, failed 7, errors 0\n"
+    },
+    {
+      "run_id": "run-2",
+      "elapsed": 115.13909912109375,
+      "cost": 0.34598064999999995,
+      "turns": 34,
+      "modules_produced": [
+        "workflow",
+        "permissions",
+        "notifications",
+        "analytics"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "fail",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 16,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 1,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nFAIL: test_14 event={'ticket': 't1', 'from': 'in_progress', 'to': 'suspended', 'is_terminal': False}\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 16, failed 1, errors 0\n"
+    },
+    {
+      "run_id": "run-3",
+      "elapsed": 171.63093757629395,
+      "cost": 0.42801034999999993,
+      "turns": 52,
+      "modules_produced": [
+        "workflow",
+        "permissions",
+        "notifications",
+        "analytics"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "fail",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 16,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 1,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nFAIL: test_14 event={'ticket': 't1', 'from': 'in_progress', 'to': 'suspended', 'is_terminal': False}\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 16, failed 1, errors 0\n"
+    }
+  ],
+  "aggregate": {
+    "total_structural_bugs": 1,
+    "total_obligation_bugs": 8,
+    "structural_opportunities": 27,
+    "obligation_opportunities": 24,
+    "mean_elapsed": 113.89229798316956,
+    "mean_cost": 0.30914499999999995
+  }
+}

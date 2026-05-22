@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-05-22T17:51:37",
+  "experiment": "E28",
+  "condition": "file",
+  "num_runs": 3,
+  "runs": [
+    {
+      "run_id": "run-1",
+      "elapsed": 92.26766753196716,
+      "cost": 0.25498394999999996,
+      "turns": 12,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass"
+      },
+      "passed": 12,
+      "failed": 0,
+      "errors": 0,
+      "info_gap_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\n\npassed 12, failed 0, errors 0\n"
+    },
+    {
+      "run_id": "run-2",
+      "elapsed": 75.21925401687622,
+      "cost": 0.19415030000000003,
+      "turns": 13,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass"
+      },
+      "passed": 12,
+      "failed": 0,
+      "errors": 0,
+      "info_gap_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\n\npassed 12, failed 0, errors 0\n"
+    },
+    {
+      "run_id": "run-3",
+      "elapsed": 48.003947019577026,
+      "cost": 0.1476413,
+      "turns": 13,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass"
+      },
+      "passed": 12,
+      "failed": 0,
+      "errors": 0,
+      "info_gap_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\n\npassed 12, failed 0, errors 0\n"
+    }
+  ],
+  "aggregate": {
+    "total_bugs": 0,
+    "total_opportunities": 36,
+    "failure_rate": 0.0,
+    "per_run_bugs": [
+      0,
+      0,
+      0
+    ],
+    "mean_elapsed": 71.83028952280681,
+    "mean_cost": 0.19892518333333334
+  }
+}

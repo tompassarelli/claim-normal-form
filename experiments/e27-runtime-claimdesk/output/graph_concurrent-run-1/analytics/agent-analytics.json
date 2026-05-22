@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 241534,
+  "duration_api_ms": 242787,
+  "num_turns": 25,
+  "result": "Done. Here's a summary of what changed and why:\n\n**Status added:** `suspended` as group `blocked` (not active, not terminal). This correctly encodes the business rules: excluded from `ACTIVE_STATUSES` workload counts, not in `TERMINAL_STATUSES`, present in `BLOCKED_STATUSES`.\n\n**Effects added (analytics & notifications scope):**\n\n| Trigger | Kind | Condition | Encodes |\n|---|---|---|---|\n| transition | notification | blocked | Blocked-state transitions always notify \u2014 separate from the `not-terminal` rule |\n| transition | analytics | blocked | Blocked transitions are tagged separately from active in event stream |\n| transition | notification | suspended | Suspended-specific notification (suspension/resumption events) |\n| transition | analytics | suspended | Suspended-specific analytics (suspension/resumption events) |\n| transition | workload | blocked | Workload-change signal when tickets enter/leave blocked \u2014 supports \"do not count in active workload\" rule |\n\n**Obligations:** Both analytics and notifications modules report structural obligations about blocked-status handling. These are persistent informational flags \u2014 the correct declarations are now in the graph and will drive code generation once the projection templates implement the `blocked`/`workload` effect kinds. The workflow module already exports `BLOCKED_STATUSES = {\"suspended\"}` and `is_blocked()`, so downstream consumers have everything they need.\n\n**Transitions not touched** \u2014 those are the workflow agent's scope. The suspended status is present in the graph so transition declarations from other agents will resolve correctly.",
+  "stop_reason": "end_turn",
+  "session_id": "02a3adbc-624a-4360-8198-fac819d88173",
+  "total_cost_usd": 0.35362675,
+  "usage": {
+    "input_tokens": 20,
+    "cache_creation_input_tokens": 16781,
+    "cache_read_input_tokens": 505370,
+    "output_tokens": 9221,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 16781,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 352,
+        "cache_read_input_tokens": 31911,
+        "cache_creation_input_tokens": 410,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 410
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 617,
+      "outputTokens": 19,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.0007120000000000001,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 20,
+      "outputTokens": 9221,
+      "cacheReadInputTokens": 505370,
+      "cacheCreationInputTokens": 16781,
+      "webSearchRequests": 0,
+      "costUSD": 0.35291475,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "5e60f159-64c6-4709-9c1a-4ba9e7f3cc11"
+}

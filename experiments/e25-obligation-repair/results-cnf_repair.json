@@ -1,0 +1,255 @@
+{
+  "timestamp": "2026-05-22 16:00:39",
+  "experiment": "E25",
+  "condition": "cnf_repair",
+  "num_runs": 3,
+  "runs": [
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 30.1,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": true,
+            "uses_is_active": true,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.0331,
+          "error": null
+        },
+        "notifications": {
+          "elapsed": 16.2,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 5,
+          "cost": 0.0385,
+          "error": null
+        },
+        "permissions": {
+          "elapsed": 25.1,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": true,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 4,
+          "cost": 0.0367,
+          "error": null
+        }
+      },
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass"
+      },
+      "info_gap_total": "0/8",
+      "info_gap_bugs": 0,
+      "repair_rounds": 1,
+      "build_time": 41.6,
+      "first_pass_info_gap": 2
+    },
+    {
+      "agents": {
+        "analytics": {
+          "elapsed": 37.3,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": true,
+            "uses_is_active": true,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 5,
+          "cost": 0.0416,
+          "error": null
+        },
+        "permissions": {
+          "elapsed": 36.7,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": false,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 6,
+          "cost": 0.0729,
+          "error": null
+        },
+        "notifications": {
+          "elapsed": 56.3,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 8,
+          "cost": 0.0951,
+          "error": null
+        }
+      },
+      "tests": {
+        "test_06_no_manage_archived": "fail",
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass"
+      },
+      "info_gap_total": "1/8",
+      "info_gap_bugs": 1,
+      "repair_rounds": 1,
+      "build_time": 77.8,
+      "first_pass_info_gap": 1
+    },
+    {
+      "agents": {
+        "permissions": {
+          "elapsed": 19.7,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": true,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.026,
+          "error": null
+        },
+        "analytics": {
+          "elapsed": 37.0,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": true,
+            "uses_is_active": true,
+            "knows_archived": false,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 6,
+          "cost": 0.0429,
+          "error": null
+        },
+        "notifications": {
+          "elapsed": 37.4,
+          "code_quality": {
+            "has_code": true,
+            "imports_workflow": true,
+            "uses_terminal_statuses": true,
+            "uses_active_statuses": false,
+            "uses_all_statuses": false,
+            "uses_is_active": false,
+            "knows_archived": true,
+            "knows_on_hold": false,
+            "hardcoded_statuses": false
+          },
+          "turns": 3,
+          "cost": 0.0396,
+          "error": null
+        }
+      },
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass"
+      },
+      "info_gap_total": "0/8",
+      "info_gap_bugs": 0,
+      "repair_rounds": 1,
+      "build_time": 62.9,
+      "first_pass_info_gap": 2
+    }
+  ],
+  "aggregate": {
+    "total_bugs": 1,
+    "total_opportunities": 24,
+    "failure_rate": 0.042,
+    "per_run_bugs": [
+      0,
+      1,
+      0
+    ],
+    "first_pass_bugs": [
+      2,
+      1,
+      2
+    ],
+    "first_pass_failure_rate": 0.208
+  }
+}

@@ -47,3 +47,9 @@ Each entry is a snapshot of understanding at the time it was written.
 | 038 | 2026-05-21 | [E23: Concurrent agents](038-e23-concurrent-agents.md) |
 | 039 | 2026-05-22 | [E23b: Shared daemon proves coordination thesis](039-e23b-shared-daemon.md) |
 | 040 | 2026-05-22 | [E20–E23c synthesis: graph runtime to concurrent composition](040-e23-synthesis.md) |
+| 041 | 2026-05-22 | [E24a: Facade spike proves discovery works](041-e24a-facade-spike.md) |
+| 042 | 2026-05-22 | [E24b: Concurrent facade — the permissions problem](042-e24b-concurrent-facade.md) |
+| 043 | 2026-05-22 | [E25: Obligation repair — the graph checks what you missed](043-e25-obligation-repair.md) |
+| 044 | 2026-05-22 | [Return to the runtime thesis](044-return-to-runtime.md) |
+| 045 | 2026-05-22 | [E27: Graph-native ClaimDesk](045-e27-graph-native-claimdesk.md) |
+| 046 | 2026-05-22 | [Graph-canonical, not graph-interpreter](046-graph-canonical-not-graph-interpreter.md) |

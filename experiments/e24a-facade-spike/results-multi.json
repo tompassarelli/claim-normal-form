@@ -1,0 +1,85 @@
+{
+  "timestamp": "2026-05-22",
+  "experiment": "E24a-multi",
+  "runs_per_condition": 5,
+  "conditions": {
+    "facade_full": {
+      "info_gap_bugs": [0, 0, 0, 0, 0],
+      "total_bugs": 0,
+      "total_opportunities": 20,
+      "failure_rate": 0.0,
+      "mean_cost_per_run": 0.135,
+      "analytics": {
+        "imports_workflow": "5/5",
+        "uses_is_active": "4/5",
+        "uses_ALL_STATUSES": "2/5",
+        "knows_archived": "0/5",
+        "hardcoded_statuses": "0/5",
+        "mean_turns": 4.6,
+        "mean_cost": 0.0588,
+        "info_gap_bugs_per_run": [0, 0, 0, 0, 0]
+      },
+      "notifications": {
+        "imports_workflow": "1/5",
+        "knows_archived": "4/5",
+        "knows_on_hold": "0/5",
+        "hardcoded_statuses": "0/5",
+        "mean_turns": 4.0,
+        "mean_cost": 0.0763,
+        "info_gap_bugs_per_run": [1, 1, 0, 1, 1]
+      }
+    },
+    "facade_basic": {
+      "info_gap_bugs": [0, 0, 0, 0, 0],
+      "total_bugs": 0,
+      "total_opportunities": 20,
+      "failure_rate": 0.0,
+      "mean_cost_per_run": 0.133,
+      "analytics": {
+        "imports_workflow": "5/5",
+        "uses_is_active": "2/5",
+        "uses_ALL_STATUSES": "3/5",
+        "knows_archived": "0/5",
+        "hardcoded_statuses": "0/5",
+        "mean_turns": 4.4,
+        "mean_cost": 0.0475,
+        "info_gap_bugs_per_run": [0, 0, 0, 0, 0]
+      },
+      "notifications": {
+        "imports_workflow": "3/5",
+        "knows_archived": "5/5",
+        "knows_on_hold": "1/5",
+        "hardcoded_statuses": "0/5",
+        "mean_turns": 5.4,
+        "mean_cost": 0.0856,
+        "info_gap_bugs_per_run": [1, 1, 0, 0, 0]
+      }
+    },
+    "no_graph": {
+      "info_gap_bugs": [3, 2, 3, 2, 2],
+      "total_bugs": 12,
+      "total_opportunities": 20,
+      "failure_rate": 0.6,
+      "mean_cost_per_run": 0.085,
+      "analytics": {
+        "imports_workflow": "0/5",
+        "uses_is_active": "0/5",
+        "uses_ALL_STATUSES": "0/5",
+        "knows_archived": "0/5",
+        "hardcoded_statuses": "2/5",
+        "mean_turns": 1.6,
+        "mean_cost": 0.0368,
+        "info_gap_bugs_per_run": [2, 2, 2, 2, 2]
+      },
+      "notifications": {
+        "imports_workflow": "0/5",
+        "knows_archived": "2/5",
+        "knows_on_hold": "0/5",
+        "hardcoded_statuses": "0/5",
+        "mean_turns": 1.0,
+        "mean_cost": 0.0481,
+        "info_gap_bugs_per_run": [2, 1, 2, 1, 1]
+      }
+    }
+  }
+}
