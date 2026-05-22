@@ -46,3 +46,4 @@ Each entry is a snapshot of understanding at the time it was written.
 | 037 | 2026-05-21 | [Graph runtime synthesis: E20–E22](037-graph-runtime-synthesis.md) |
 | 038 | 2026-05-21 | [E23: Concurrent agents](038-e23-concurrent-agents.md) |
 | 039 | 2026-05-22 | [E23b: Shared daemon proves coordination thesis](039-e23b-shared-daemon.md) |
+| 040 | 2026-05-22 | [E20–E23c synthesis: graph runtime to concurrent composition](040-e23-synthesis.md) |
