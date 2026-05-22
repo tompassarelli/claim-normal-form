@@ -985,11 +985,44 @@ flat-set representation → no cross-entity relations → no obligations →
 no downstream module coverage. File failure rate scales with relational
 density: E31 29% → E32 88%.
 
-### NOW: E33 — Real App Projection
+### NOW: E33 — Coordination Curve on the Graph-Canonical Substrate
 
-The projected Python passes integration tests, but no one is running
-it as a live application. Test whether the graph-projected artifact
-actually serves requests.
+The only thing that matters per `user_goal.md`: at what program size
+and agent count does graph-canonical multi-agent construction beat
+file+git multi-agent construction on wall-clock to a runnable, correct
+application?
+
+The coordination curve has not been measured on the graph-canonical
+substrate. F8/F9/F10 measured it in the old Python-as-source frame.
+E20–E32 either tested 1–2 agents or single-agent representation
+properties. E33 fills the gap.
+
+Conditions: file+git (worktrees + coordinator + repair) vs cnf-graph
+(shared daemon + claim edits + projection). Axes: agent count (3, 5,
+8) and program size. Primary metric: wall-clock end-to-end.
+
+Scope: `docs/experiments/e33-coordination-curve/scope.md`.
+
+Open decisions before running:
+1. Target app (expanded ClaimDesk vs real reference vs custom real
+   app) — user_goal.md says "real app", which the synthetic
+   ClaimDesk probably doesn't satisfy
+2. Which subset of "real app" lives in the graph; what's projection
+   vs hand-written scaffolding
+3. Acceptance test definition (structural vs HTTP integration)
+4. Repair budget policy in the file condition
+
+Pre-experiment infrastructure: 8-connection daemon stress test;
+projection target beyond synthetic Python; domain claim schema
+for the target app.
+
+### DEFERRED: Real App Projection (was prior NOW)
+
+"Does the projected Python actually serve requests?" is a valid
+orthogonal question but it's not the wall-clock coordination question
+the user cares about. Folded as a sub-decision inside E33 (decision
+3): the acceptance test definition determines whether the projected
+artifact must literally run as a service.
 
 ### OPEN: Totality as a per-node queryable property
 
