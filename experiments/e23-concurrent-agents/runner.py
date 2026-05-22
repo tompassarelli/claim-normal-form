@@ -283,6 +283,42 @@ Starting program:
 """
 
 
+REPAIR_AGENT_PROMPT = """\
+You are a merge-repair agent. Two agents edited a program concurrently.
+Their changes were merged, but {conflicts} functions have conflicts.
+
+WHAT EACH AGENT DID:
+- Agent A (safety): Added a safe-div function and replaced raw division
+  with safe-div calls in 8 functions. safe-div returns 0 when divisor is 0.
+- Agent B (refactor): Renamed the function "helper" to "utility". All call
+  sites were updated. "helper-rate", "tax-helper", and parameters named
+  "helper" in process-a/b/c were NOT renamed.
+
+THE CONFLICT: In the overlap functions, Agent A wrapped division with
+safe-div but still references "helper". Agent B renamed "helper" to
+"utility" but didn't add safe-div. The correct resolution combines both:
+use safe-div AND use "utility" as the function name.
+
+Also check: the definition of "utility" may be missing from the merge.
+If so, add it: (defn utility [x y] (+ x y))
+
+YOUR TASK:
+1. Read the conflicted program in program.cnf
+2. Resolve ALL conflicts by combining both agents' changes
+3. Fix any missing definitions
+4. Write the corrected program.cnf
+5. Verify with: racket eval-helper.rkt eval program.cnf ratio 10 0
+   (should return 0, not crash)
+6. Verify with: racket eval-helper.rkt eval program.cnf utility 3 4
+   (should return 7)
+7. Render: racket eval-helper.rkt render program.cnf
+   (should be coherent, no conflicts, no comments)
+
+Write ONLY the final corrected program to program.cnf. No conflict markers,
+no comments.
+"""
+
+
 # ════════════════════════════════════════════════════════════════════
 # Infrastructure
 # ════════════════════════════════════════════════════════════════════
@@ -512,15 +548,16 @@ def launch_graph_agent(name, prompt, mcp_config_path):
         }
 
 
-def launch_text_agent(name, prompt, workspace):
+def launch_text_agent(name, prompt, workspace, timeout=None):
     print(f"    Launching text agent: {name} (workspace: {workspace})")
+    agent_timeout = timeout or TIMEOUT
     start = time.monotonic()
     try:
         result = subprocess.run(
             ["claude", "-p", "--model", MODEL,
              "--dangerously-skip-permissions"],
             input=prompt,
-            capture_output=True, text=True, timeout=TIMEOUT,
+            capture_output=True, text=True, timeout=agent_timeout,
             cwd=str(workspace),
         )
         elapsed = time.monotonic() - start
@@ -872,7 +909,7 @@ def run_text_condition():
 
     verification = verify_merged_program(merged)
 
-    return {
+    result = {
         "condition": "text",
         "total_elapsed": total_elapsed,
         "agent_a": {
@@ -891,6 +928,58 @@ def run_text_condition():
             "agent_a": result_a["transcript"],
             "agent_b": result_b["transcript"],
         },
+    }
+
+    if conflicts > 0 and "--no-repair" not in sys.argv:
+        repair = run_text_repair(merged, conflicts)
+        if repair:
+            result["repair"] = repair
+            result["repair_rounds"] = 1
+            result["repaired_program"] = repair["repaired_program"]
+            result["repair_verification"] = repair["verification"]
+            result["total_with_repair"] = total_elapsed + repair["elapsed"]
+
+    return result
+
+
+def run_text_repair(merged_program, conflicts):
+    """Launch a repair agent to resolve conflicts in the merged program."""
+    print(f"\n  ── TEXT REPAIR: resolving {conflicts} conflicts ──")
+
+    ws = Path(tempfile.mkdtemp(prefix="e23-text-repair-"))
+    (ws / "program.cnf").write_text(merged_program)
+    shutil.copy(SCRIPT_DIR / "eval-helper.rkt", ws / "eval-helper.rkt")
+
+    prompt = REPAIR_AGENT_PROMPT.format(conflicts=conflicts)
+    print(f"  Workspace: {ws}")
+
+    repair_result = launch_text_agent(
+        "repair-agent", prompt, ws, timeout=180)
+
+    print(f"  Repair agent done. Time: {repair_result['elapsed']:.1f}s")
+
+    repaired = repair_result.get("modified_program", "")
+    if not repaired:
+        print("  WARN: Repair agent produced no output")
+        return None
+
+    (SCRIPT_DIR / "text-repaired.cnf").write_text(repaired)
+
+    verification = verify_merged_program(repaired)
+
+    v_pass = sum(1 for v in verification.values() if v)
+    v_total = len(verification)
+    print(f"  Repair verification: {v_pass}/{v_total}")
+    for k, v in verification.items():
+        if not v:
+            print(f"    FAIL: {k}")
+
+    return {
+        "elapsed": repair_result["elapsed"],
+        "error": repair_result["error"],
+        "repaired_program": repaired,
+        "verification": verification,
+        "transcript": repair_result["transcript"],
     }
 
 
@@ -937,6 +1026,18 @@ def print_results(graph_result, text_result):
             if not val:
                 print(f"    FAIL: {k}")
 
+        if result.get("repair"):
+            rep = result["repair"]
+            rv = rep["verification"]
+            r_pass = sum(1 for val in rv.values() if val)
+            print(f"\n  Repair:")
+            print(f"    Time:           {rep['elapsed']:.1f}s")
+            print(f"    Total (initial + repair): {result['total_with_repair']:.1f}s")
+            print(f"    Verification:   {r_pass}/{len(rv)}")
+            for k, val in sorted(rv.items()):
+                if not val:
+                    print(f"    FAIL: {k}")
+
     # Coordination comparison
     if graph_result and text_result:
         print(f"\n  ── COMPARISON ──")
@@ -967,6 +1068,24 @@ def main():
 
     graph_result = None
     text_result = None
+
+    if "--repair-only" in sys.argv:
+        merged_path = SCRIPT_DIR / "text-merged.cnf"
+        if not merged_path.exists():
+            print("  ERROR: text-merged.cnf not found. Run text condition first.")
+            sys.exit(1)
+        merged = merged_path.read_text()
+        conflicts = merged.count(";; CONFLICT:")
+        print(f"\n  ── REPAIR ONLY: {conflicts} conflicts from existing merge ──")
+        repair = run_text_repair(merged, conflicts)
+        if repair:
+            rv = repair["verification"]
+            r_pass = sum(1 for v in rv.values() if v)
+            print(f"\n  Repair result: {r_pass}/{len(rv)} in {repair['elapsed']:.1f}s")
+            for k, v in sorted(rv.items()):
+                if not v:
+                    print(f"    FAIL: {k}")
+        return
 
     if "--text-only" not in sys.argv:
         graph_result = run_graph_condition()
@@ -1019,6 +1138,19 @@ def main():
         if text_result.get("merged_program"):
             (SCRIPT_DIR / "text-merged.cnf").write_text(
                 text_result["merged_program"])
+        if text_result.get("repair"):
+            rep = text_result["repair"]
+            output["text"]["repair"] = {
+                "elapsed": rep["elapsed"],
+                "error": rep["error"],
+                "verification": rep["verification"],
+                "total_with_repair": text_result.get("total_with_repair"),
+            }
+            (SCRIPT_DIR / "text-repair-transcript.md").write_text(
+                rep.get("transcript", ""))
+            if text_result.get("repaired_program"):
+                (SCRIPT_DIR / "text-repaired.cnf").write_text(
+                    text_result["repaired_program"])
 
     results_file = SCRIPT_DIR / "results.json"
     with open(results_file, "w") as f:

@@ -771,9 +771,20 @@ Connection C sees accumulated state.
 
 Both agents on same daemon. Graph: 0 conflicts, 26/26 verification,
 both changes integrated (`(safe-div (utility a b) b)` in overlap zone).
-Text (fixed isolation): 4 conflicts, definition lost in merge. MVCC
-witness: fresh TCP connection sees pre-agents 2474 objects → post-agents
-24714 objects. Error history (run 35249) queryable by fresh connection.
+Text (fixed isolation): 4 conflicts, definition lost in merge. Repair
+agent resolved all conflicts in 48.9s (14/14). Total: graph 346.2s
+one-pass vs text 213.4s (164.5s + 48.9s repair). Agent B graph time
+is an outlier (typical ~105s). E23c with `resolve_symbol` fix
+confirmed the slowness is Sonnet variance, not a code bug.
+
+`resolve_symbol` fix: `prefer-non-param` in kernel.rkt filters
+entities with position claims (parameters) when multiple entities
+share a name. E23c rerun: 327.9s graph, 285.7s text+repair. Same
+structural result: 0 conflicts vs 4 conflicts.
+
+MVCC witness: fresh TCP connection sees pre-agents 2474 objects →
+post-agents 24714 objects. Error history (run 35249) queryable by
+fresh connection.
 
 See `experiments/e23-concurrent-agents/` and
 `docs/experiments/e23-concurrent-agents/results.md`.

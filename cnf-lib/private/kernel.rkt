@@ -185,7 +185,9 @@
               [live (filter (lambda (cid) (not (superseded? cid))) cids)])
          (cond
            [(not (null? live))
-            (claim-rec-l (hash-ref (cnf-ctx-claims ctx) (first live)))]
+            (prefer-non-param ctx (map (lambda (cid)
+                                         (claim-rec-l (hash-ref (cnf-ctx-claims ctx) cid)))
+                                       live))]
            [else
             (define npid (hash-ref (cnf-ctx-ext ctx) 'name-pred #f))
             (and npid
@@ -193,7 +195,23 @@
                                          (cons npid vid) '())]
                         [nlive (filter (lambda (cid) (not (superseded? cid))) ncids)])
                    (and (not (null? nlive))
-                        (claim-rec-l (hash-ref (cnf-ctx-claims ctx) (first nlive))))))]))))
+                        (prefer-non-param ctx (map (lambda (cid)
+                                                     (claim-rec-l (hash-ref (cnf-ctx-claims ctx) cid)))
+                                                   nlive)))))]))))
+
+(define (prefer-non-param ctx entities)
+  (define pos-pred (hash-ref (cnf-ctx-ext ctx) 'position-pred #f))
+  (cond
+    [(or (null? entities) (null? (cdr entities)) (not pos-pred))
+     (and (pair? entities) (first entities))]
+    [else
+     (define (has-position? eid)
+       (not (null? (hash-ref (cnf-ctx-idx-by-lp ctx)
+                              (cons eid pos-pred) '()))))
+     (define non-params (filter (lambda (e) (not (has-position? e))) entities))
+     (if (null? non-params)
+         (first entities)
+         (first non-params))]))
 
 (define (resolve-value id)
   (hash-ref (cnf-ctx-values (current-ctx)) id #f))

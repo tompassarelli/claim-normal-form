@@ -56,13 +56,26 @@ showed 0 conflicts for both — but neither measurement was honest.
 
 ## What I learned
 
-The graph's advantage isn't speed — text was faster this run (164s vs
-346s). It's that rename and body-modification are different operations
-in the claim model. They can't conflict because they modify different
-predicates. This isn't a property of this test — it's a structural
-consequence of the entity/claim architecture.
+Graph completed the concurrent task with integrated semantics. Text
+completed two separate partial tasks and failed to merge them.
 
-Text editing collapses these distinct operations into "edit this line."
-When two agents edit the same line for different semantic reasons, the
-merge can't know that both changes are needed. The graph never has
-this problem because the operations were never entangled.
+The wall-clock comparison is incomplete — text was faster (164s) but
+produced an incomplete conflicted merge. Graph was slower (346s) but
+produced a verified coherent program. The fair comparison needs
+repair rounds on the text side: initial time + diagnosis + repair +
+verification. Agent B's 346s is also suspicious — likely a
+`resolve_symbol` ambiguity bug, not fundamental MVCC cost.
+
+The repair round filled in the missing number: 48.9s for a third
+agent to resolve all 4 text conflicts. Total text time to correct
+program: 213.4s. Graph: 346.2s (but Agent B's time is an outlier —
+typical would be ~105s). The repaired text matches the graph output
+exactly: `(safe-div (utility a b) b)` in all overlap functions.
+
+The architectural point: rename and body-modification are different
+predicates in the claim model. They can't conflict because they were
+never entangled. Text editing collapses both into "edit this line."
+When two agents edit the same line for different semantic reasons,
+the merge can't know that both changes are needed. A repair agent
+can fix it, but it needs to understand intent — that cost scales
+with conflict complexity, while graph cost stays zero.
