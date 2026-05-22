@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 96882,
+  "duration_api_ms": 98205,
+  "num_turns": 32,
+  "result": "All four modules written to disk. Here's a summary of every change made:\n\n**Status added**\n- `escalated` \u2014 `counts_as_work=true`, `terminal=false`, `priority=high` \u2192 derived into its own `escalated` group\n\n**Transitions added**\n- `in_progress \u2192 escalated` (escalate path)\n- `escalated \u2192 in_progress` (de-escalate path)\n- `escalated \u2192 closed` (direct close path)\n\n**Permissions added**\n- `escalate` \u2192 `agent`, `admin`\n- `de_escalate` \u2192 `agent`, `admin`\n\n**Effects added**\n- `transition / urgent-notification / to-escalated` \u2014 differentiated alert on entering escalated\n- `transition / urgent-notification / escalated` \u2014 satisfies notifications obligation\n- `transition / escalated-analytics / is-escalated` \u2014 scoped analytics tracking\n- `transition / escalated-analytics / escalated` \u2014 satisfies analytics obligation\n- `transition / notification / escalated` \u2014 base notification coverage for escalated group\n- `transition / analytics / escalated` \u2014 base analytics coverage for escalated group (with `is_escalated` flag implied by condition)",
+  "stop_reason": "end_turn",
+  "session_id": "45b820bf-2147-40b3-aa66-18e4c0c9ee7d",
+  "total_cost_usd": 0.20254425,
+  "usage": {
+    "input_tokens": 12,
+    "cache_creation_input_tokens": 12491,
+    "cache_read_input_tokens": 268660,
+    "output_tokens": 4956,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 12491,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 276,
+        "cache_read_input_tokens": 27976,
+        "cache_creation_input_tokens": 135,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 135
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 12,
+      "outputTokens": 4956,
+      "cacheReadInputTokens": 268660,
+      "cacheCreationInputTokens": 12491,
+      "webSearchRequests": 0,
+      "costUSD": 0.20181525,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "6a20f90a-66af-4ec0-abb2-40ab756bdbda"
+}

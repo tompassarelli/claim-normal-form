@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 148334,
+  "duration_api_ms": 149345,
+  "num_turns": 25,
+  "result": "Done. Here's a summary of every change made to the graph:\n\n**Status added**\n- `escalated` \u2014 `counts_as_work: true`, `terminal: false`, `priority: high` \u2192 assigned to its own `escalated` group (distinct from `active` and `terminal`)\n\n**Transitions added**\n- `in_progress \u2192 escalated` (escalate path)\n- `escalated \u2192 in_progress` (de-escalate path)\n- `escalated \u2192 closed` (direct close without de-escalating)\n\n**Permissions added**\n- `escalate` \u2192 `agent`, `admin`\n- `de_escalate` \u2192 `agent`, `admin`\n\n**Effects added**\n- `transition / urgent-notification / condition: escalated` \u2014 fires specifically on transitions into the escalated group, differentiated from the generic `not-terminal` notification\n- `transition / analytics / condition: is-escalated` \u2014 tags analytics events when the destination status is escalated, satisfying the `is_escalated` flag requirement\n\nThe two remaining obligation messages from notifications and analytics are the system flagging that those handlers need to implement the escalated-specific branching \u2014 the graph claims are the source of truth and the projected Python reflects them.",
+  "stop_reason": "end_turn",
+  "session_id": "ade4a532-3a4f-461c-a9c6-9c6e6ec3605a",
+  "total_cost_usd": 0.25061145,
+  "usage": {
+    "input_tokens": 11,
+    "cache_creation_input_tokens": 15597,
+    "cache_read_input_tokens": 240219,
+    "output_tokens": 7953,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 15597,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 279,
+        "cache_read_input_tokens": 30041,
+        "cache_creation_input_tokens": 1176,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1176
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 11,
+      "outputTokens": 7953,
+      "cacheReadInputTokens": 240219,
+      "cacheCreationInputTokens": 15597,
+      "webSearchRequests": 0,
+      "costUSD": 0.24988245,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "eba57ab9-0e34-4b64-bde6-c1af943e11d1"
+}

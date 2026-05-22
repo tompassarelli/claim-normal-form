@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 116810,
+  "duration_api_ms": 118191,
+  "num_turns": 46,
+  "result": "All 4 modules projected cleanly. Here's what was added:\n\n**Priority levels:**\n| Priority | SLA Target | Notification Mode | Required Role | Auto-Escalates |\n|----------|-----------|-------------------|---------------|----------------|\n| low | 24h | normal | any | no |\n| normal | 8h | normal | any | no |\n| high | 4h | immediate_email | any | no |\n| critical | 1h | urgent_page | senior+ | yes \u2192 `escalated` |\n\n**New permissions:** `set_priority_critical` requires `senior` or `admin`.\n\n**New effects added to resolve obligations:**\n- `create` \u2192 `notification` / `analytics` / `sla_check` / `priority_analytics` / `sla_analytics` (ticket creation events)\n- `transition` \u2192 `sla_check` / `sla_analytics` / `priority_notification` (SLA tracking on every state move)\n- `transition/notification` with `condition=priority` (satisfies the priority notification obligation)\n- `transition/analytics` with `condition=priority` (satisfies the priority/SLA analytics obligation)\n\nOutput written to `output/e32-graph-run-1/projected/`.",
+  "stop_reason": "end_turn",
+  "session_id": "17125b08-206c-4704-990c-8f9cbbff6adc",
+  "total_cost_usd": 0.3412893,
+  "usage": {
+    "input_tokens": 26,
+    "cache_creation_input_tokens": 14596,
+    "cache_read_input_tokens": 665541,
+    "output_tokens": 5745,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 14596,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 287,
+        "cache_read_input_tokens": 30433,
+        "cache_creation_input_tokens": 132,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 132
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 559,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000639,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 26,
+      "outputTokens": 5745,
+      "cacheReadInputTokens": 665541,
+      "cacheCreationInputTokens": 14596,
+      "webSearchRequests": 0,
+      "costUSD": 0.34065029999999996,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "2de494c7-8a9c-44c6-b2fa-58ba84c36512"
+}

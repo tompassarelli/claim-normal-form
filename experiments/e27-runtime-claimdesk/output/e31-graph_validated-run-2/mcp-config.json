@@ -1,0 +1,1 @@
+{"mcpServers": {"claimdesk": {"command": "racket", "args": ["/home/tom/code/cnf-racket/experiments/e27-runtime-claimdesk/claimdesk-mcp.rkt", "--output-dir", "/home/tom/code/cnf-racket/experiments/e27-runtime-claimdesk/output/e31-graph_validated-run-2/projected", "--mode", "validated"]}}}

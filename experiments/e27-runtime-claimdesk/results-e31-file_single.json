@@ -1,0 +1,127 @@
+{
+  "timestamp": "2026-05-22T20:49:22",
+  "experiment": "E31",
+  "condition": "file_single",
+  "num_runs": 3,
+  "runs": [
+    {
+      "run_id": "run-1",
+      "elapsed": 50.989593505859375,
+      "cost": 0.1517636,
+      "turns": 13,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "fail",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07_is_active_false": "error",
+        "test_08_is_terminal_false": "error",
+        "test_09": "pass",
+        "test_10": "fail",
+        "test_11_is_escalated_helper": "error",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 12,
+      "total": 17,
+      "structural_bugs": 3,
+      "obligation_bugs": 2,
+      "raw_output": "PASS: test_01\nFAIL: test_02 ACTIVE_STATUSES=['open', 'in_progress', 'resolved', 'on_hold', 'escalated']\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nERROR: test_07_is_active_false: 'str' object has no attribute 'status'\nERROR: test_08_is_terminal_false: name 'is_terminal' is not defined\nPASS: test_09\nFAIL: test_10 ESCALATED_STATUSES not defined in workflow\nERROR: test_11_is_escalated_helper: 'str' object has no attribute 'status'\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 12, failed 2, errors 3\n"
+    },
+    {
+      "run_id": "run-2",
+      "elapsed": 57.6307647228241,
+      "cost": 0.1568868,
+      "turns": 14,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "fail",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07_is_active_false": "error",
+        "test_08_is_terminal_false": "error",
+        "test_09": "pass",
+        "test_10": "fail",
+        "test_11": "fail",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 12,
+      "total": 17,
+      "structural_bugs": 3,
+      "obligation_bugs": 2,
+      "raw_output": "PASS: test_01\nFAIL: test_02 ACTIVE_STATUSES=['open', 'in_progress', 'resolved', 'on_hold', 'escalated']\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nERROR: test_07_is_active_false: 'str' object has no attribute 'status'\nERROR: test_08_is_terminal_false: name 'is_terminal' is not defined\nPASS: test_09\nFAIL: test_10 ESCALATED_STATUSES not defined in workflow\nFAIL: test_11 is_escalated not defined in workflow\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 12, failed 3, errors 2\n"
+    },
+    {
+      "run_id": "run-3",
+      "elapsed": 51.909077644348145,
+      "cost": 0.16251365,
+      "turns": 13,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "fail",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07_is_active_false": "error",
+        "test_08_is_terminal_false": "error",
+        "test_09": "pass",
+        "test_10": "fail",
+        "test_11_is_escalated_helper": "error",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 12,
+      "total": 17,
+      "structural_bugs": 3,
+      "obligation_bugs": 2,
+      "raw_output": "PASS: test_01\nFAIL: test_02 ACTIVE_STATUSES=['open', 'in_progress', 'resolved', 'on_hold', 'escalated']\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nERROR: test_07_is_active_false: 'str' object has no attribute 'status'\nERROR: test_08_is_terminal_false: name 'is_terminal' is not defined\nPASS: test_09\nFAIL: test_10 ESCALATED_STATUSES not defined in workflow\nERROR: test_11_is_escalated_helper: 'str' object has no attribute 'status'\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 12, failed 2, errors 3\n"
+    }
+  ],
+  "aggregate": {
+    "total_structural_bugs": 9,
+    "total_obligation_bugs": 6,
+    "structural_opportunities": 27,
+    "obligation_opportunities": 24,
+    "mean_elapsed": 53.50981195767721,
+    "mean_cost": 0.15705468333333333
+  }
+}

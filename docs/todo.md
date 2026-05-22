@@ -953,30 +953,39 @@ internal classification. Don't make the agent pick ontology labels.
 
 See `docs/experiments/e27-runtime-claimdesk/results-e30.md`.
 
-### NOW: Typed effect constructors
+### DONE: E31 — Novel Group Synthesis
 
-The "blocked" / "tag-blocked" fix is enough for E30, but stringly-typed
-effect conditions are a remaining source of fragility. Replace with
-typed constructors before the next experiment.
+Property-derived classification generalizes to groups with overlapping
+properties. Escalated shares `counts_as_work=true` with active but the
+graph's most-specific-match algorithm correctly separates them.
 
-### NEXT: E31 — Novel Group Synthesis
+All graph conditions: 0/27 structural bugs. file_single: 9/27
+(deterministic — puts escalated in ACTIVE_STATUSES every run).
+graph_validated 1/24 obligation bugs, graph_label and graph_properties
+2/24 each, file_single 6/24.
 
-Test whether property-derived classification generalizes beyond the
-three-group model. Task: add "escalated" tickets — still active work,
-requires manager visibility, changes SLA timers, triggers urgent
-notifications, affects analytics differently, can be de-escalated.
+The progression: E28 both correct → E29 graph amplifies → E30 property-
+derived eliminates misclassification → E31 most-specific-match
+generalizes to novel overlapping groups.
 
-The graph must either derive a new group or derive a subtype/tag
-layered over an existing group. Tests whether the design principle
-from E30 compounds.
+See `docs/experiments/e27-runtime-claimdesk/results-e31.md`.
 
-### NEXT: E32 — Multi-Entity Feature
+### DEFERRED: Typed effect constructors
 
-Feature that touches more than statuses: new role + new permissions +
-new effects + new workflow semantics. Tests whether CNF can coordinate
-multiple concept types, not just status classification.
+The "blocked" / "tag-blocked" fix is enough for E30/E31. Stringly-typed
+effect conditions work correctly with the group-driven obligation
+checker and projector. Infrastructure issue, not blocking experiments.
 
-### NEXT: E33 — Real App Projection
+### DONE: E32 — Cross-Entity Obligation Synthesis
+
+Priority as multi-property entity with cross-entity obligations (priority
+→ role, notification, escalation, SLA). Graph 0/51 bugs across all
+categories. File 45/51 (88% failure, deterministic). Failure cascade:
+flat-set representation → no cross-entity relations → no obligations →
+no downstream module coverage. File failure rate scales with relational
+density: E31 29% → E32 88%.
+
+### NOW: E33 — Real App Projection
 
 The projected Python passes integration tests, but no one is running
 it as a live application. Test whether the graph-projected artifact

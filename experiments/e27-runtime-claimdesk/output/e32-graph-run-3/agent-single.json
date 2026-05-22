@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 86090,
+  "duration_api_ms": 87192,
+  "num_turns": 30,
+  "result": "All 4 modules projected. Here's a summary of what was added:\n\n**Priorities**\n| Name | Target | Role | Notification | Auto-escalate |\n|---|---|---|---|---|\n| low | 24h | any | normal | no |\n| normal | 8h | any | normal | no |\n| high | 4h | any | immediate_email | no |\n| critical | 1h | senior+ | urgent_page | \u2192 escalated |\n\n**Permissions added**\n- `set_priority_critical` \u2192 senior, admin\n\n**Effects added**\n- `create` / analytics (always) \u2014 SLA baseline on ticket creation\n- `create` / notification (always) \u2014 routing alert on new ticket\n- `priority_set` / notification (always) \u2014 fires when priority changes\n- `priority_set` / analytics (always) \u2014 records priority assignment events\n- `transition` / notification (priority_elevated) \u2014 notifies on high/critical transitions\n- `transition` / analytics (priority_sla) \u2014 SLA tracking per priority tier\n- `transition` / notification (sla_breach) \u2014 breach alert\n- `transition` / analytics (sla_breach) \u2014 breach record",
+  "stop_reason": "end_turn",
+  "session_id": "75b8d3ab-dd19-43b2-b263-e5e1f963a6b1",
+  "total_cost_usd": 0.2346885,
+  "usage": {
+    "input_tokens": 16,
+    "cache_creation_input_tokens": 12830,
+    "cache_read_input_tokens": 382980,
+    "output_tokens": 4733,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 12830,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 273,
+        "cache_read_input_tokens": 28679,
+        "cache_creation_input_tokens": 120,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 120
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 559,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000639,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 16,
+      "outputTokens": 4733,
+      "cacheReadInputTokens": 382980,
+      "cacheCreationInputTokens": 12830,
+      "webSearchRequests": 0,
+      "costUSD": 0.2340495,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "0244a825-1f57-45c5-abbf-55c5ae10c4ce"
+}

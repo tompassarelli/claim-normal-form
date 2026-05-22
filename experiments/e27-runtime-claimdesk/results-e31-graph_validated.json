@@ -1,0 +1,127 @@
+{
+  "timestamp": "2026-05-22T20:53:39",
+  "experiment": "E31",
+  "condition": "graph_validated",
+  "num_runs": 3,
+  "runs": [
+    {
+      "run_id": "run-1",
+      "elapsed": 155.77104115486145,
+      "cost": 0.40632689999999994,
+      "turns": 41,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "Done. Here's a summary of every graph change made:\n\n**Status**\n- Added `escalated` (group: escalated, counts_as_work: true, terminal: false, priority: high)\n\n**Transitions**\n- `in_progress \u2192 escalated`\n- `escalated \u2192 in_progress` (de-escalate path)\n- `escalated \u2192 closed` (close directly)\n\n**Permissi",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 17,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 17, failed 0, errors 0\n"
+    },
+    {
+      "run_id": "run-2",
+      "elapsed": 99.55309867858887,
+      "cost": 0.20262554999999996,
+      "turns": 24,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "Done. Here's a summary of everything added to the graph:\n\n**Status**\n- `escalated` \u2014 group: escalated, counts_as_work: true, terminal: false, priority: high\n\n**Transitions**\n- `in_progress \u2192 escalated` (escalate)\n- `escalated \u2192 in_progress` (de-escalate)\n- `escalated \u2192 closed` (close directly)\n\n**Pe",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "fail",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 16,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 1,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nFAIL: test_14 event={'ticket': 't1', 'from': 'in_progress', 'to': 'escalated', 'is_terminal': False}\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 16, failed 1, errors 0\n"
+    },
+    {
+      "run_id": "run-3",
+      "elapsed": 167.6486496925354,
+      "cost": 0.31447679999999995,
+      "turns": 29,
+      "modules_produced": [
+        "workflow",
+        "notifications",
+        "analytics",
+        "permissions"
+      ],
+      "agent_result_snippet": "Done. Here's a summary of every change made to the graph:\n\n**Status added**\n- `escalated` \u2014 group `escalated`, `counts_as_work=true`, `terminal=false`, `priority=high`\n\n**Transitions added**\n- `in_progress \u2192 escalated` (escalate)\n- `escalated \u2192 in_progress` (de-escalate)\n- `escalated \u2192 closed` (clos",
+      "tests": {
+        "test_01": "pass",
+        "test_02": "pass",
+        "test_03": "pass",
+        "test_04": "pass",
+        "test_05": "pass",
+        "test_06": "pass",
+        "test_07": "pass",
+        "test_08": "pass",
+        "test_09": "pass",
+        "test_10": "pass",
+        "test_11": "pass",
+        "test_12": "pass",
+        "test_13": "pass",
+        "test_14": "pass",
+        "test_15": "pass",
+        "test_16": "pass",
+        "test_17": "pass"
+      },
+      "passed": 17,
+      "total": 17,
+      "structural_bugs": 0,
+      "obligation_bugs": 0,
+      "raw_output": "PASS: test_01\nPASS: test_02\nPASS: test_03\nPASS: test_04\nPASS: test_05\nPASS: test_06\nPASS: test_07\nPASS: test_08\nPASS: test_09\nPASS: test_10\nPASS: test_11\nPASS: test_12\nPASS: test_13\nPASS: test_14\nPASS: test_15\nPASS: test_16\nPASS: test_17\n\npassed 17, failed 0, errors 0\n"
+    }
+  ],
+  "aggregate": {
+    "total_structural_bugs": 0,
+    "total_obligation_bugs": 1,
+    "structural_opportunities": 27,
+    "obligation_opportunities": 24,
+    "mean_elapsed": 140.99092984199524,
+    "mean_cost": 0.30780974999999994
+  }
+}

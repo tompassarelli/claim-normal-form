@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 127674,
+  "duration_api_ms": 128674,
+  "num_turns": 35,
+  "result": "Done. Here's a summary of every change made to the graph:\n\n**Status**\n- `escalated` added with group `escalated` (non-terminal, counts as active work)\n\n**Transitions**\n- `in_progress \u2192 escalated` (escalate a ticket)\n- `escalated \u2192 in_progress` (de-escalate)\n- `escalated \u2192 closed` (close directly from escalated)\n\n**Permissions**\n- `escalate`: agent, admin\n- `de_escalate`: agent, admin\n\n**Effects**\n- `transition / escalation-notification` (condition: escalated) \u2014 differentiated urgent notification\n- `transition / escalated-analytics` (condition: escalated) \u2014 escalated-specific analytics event\n- `transition / urgent-notification` (condition: escalated)\n- `transition / is-escalated-flag` (condition: escalated)\n\n**What projected correctly:**\n- `workflow.py`: `ESCALATED_STATUSES = {\"escalated\"}`, correct `VALID_TRANSITIONS`, `is_escalated()` predicate\n- `permissions.py`: `escalate` and `de_escalate` rules for agent + admin\n- `analytics.py`: `active_ticket_count` already counts escalated tickets in workload (`ACTIVE_STATUSES | ESCALATED_STATUSES`)\n\n**Note on obligations:** The obligation checker reported that analytics events don't yet stamp `is_escalated` and notifications don't branch on escalated \u2014 these are projection-template gaps, not graph gaps. All semantic claims are correctly recorded in the graph; the projection engine would need template updates to fully close those two structural checks.",
+  "stop_reason": "end_turn",
+  "session_id": "f2d538d1-e8d0-44d7-8621-5b66a93ac28b",
+  "total_cost_usd": 0.313959,
+  "usage": {
+    "input_tokens": 14,
+    "cache_creation_input_tokens": 31126,
+    "cache_read_input_tokens": 306235,
+    "output_tokens": 6973,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 31126,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 375,
+        "cache_read_input_tokens": 30281,
+        "cache_creation_input_tokens": 845,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 845
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 14,
+      "outputTokens": 6973,
+      "cacheReadInputTokens": 306235,
+      "cacheCreationInputTokens": 31126,
+      "webSearchRequests": 0,
+      "costUSD": 0.31323,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "822faab2-a1cc-457c-8ffd-bf0559467525"
+}

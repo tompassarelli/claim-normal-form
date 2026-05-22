@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 44486,
+  "duration_api_ms": 45881,
+  "num_turns": 20,
+  "result": "Done. Here's what was added to the ClaimDesk domain:\n\n**Status**\n- `escalated` (group: `escalated`) \u2014 active, non-terminal, counts toward workload\n\n**Transitions**\n- `in_progress \u2192 escalated`\n- `escalated \u2192 in_progress` (de-escalate)\n- `escalated \u2192 closed` (close directly without de-escalating)\n\n**Permissions**\n- `escalate` requires `admin`\n- `de_escalate` requires `admin`\n\n**Effects**\n- `transition / urgent-notification / escalated` \u2014 fires differentiated notification on escalation (not the normal transition notification)\n- `transition / analytics-is-escalated / escalated` \u2014 tags escalated transitions separately in analytics\n\nPermissions and workflow passed obligation checks with no violations. The notifications and analytics modules surfaced the expected obligations, which the two new `escalated`-condition effects satisfy.",
+  "stop_reason": "end_turn",
+  "session_id": "d7dd3f17-780b-4197-8999-b58affabbafb",
+  "total_cost_usd": 0.135324,
+  "usage": {
+    "input_tokens": 11,
+    "cache_creation_input_tokens": 9272,
+    "cache_read_input_tokens": 223940,
+    "output_tokens": 2174,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 9272,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 211,
+        "cache_read_input_tokens": 24694,
+        "cache_creation_input_tokens": 136,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 136
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 11,
+      "outputTokens": 2174,
+      "cacheReadInputTokens": 223940,
+      "cacheCreationInputTokens": 9272,
+      "webSearchRequests": 0,
+      "costUSD": 0.134595,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "5a2589b1-826e-4523-af90-450a39e56387"
+}

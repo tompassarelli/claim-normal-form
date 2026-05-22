@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 199399,
+  "duration_api_ms": 202558,
+  "num_turns": 42,
+  "result": "All 4 modules projected. Here's a summary of what was added to the graph:\n\n**Priorities**\n| Priority | Response Target | Required Role | Notification Mode | Auto-Escalate |\n|---|---|---|---|---|\n| low | 24h | any | normal | no |\n| normal | 8h | any | normal | no |\n| high | 4h | any | immediate_email | no |\n| critical | 1h | senior | urgent_page | yes \u2192 escalated |\n\n**Permissions added**\n- `set_critical_priority` \u2192 senior, admin\n\n**Effects added**\n- `create / analytics / always` \u2014 track all ticket creation with priority context\n- `create / notification / high-priority` \u2014 immediate email on high-priority ticket creation\n- `create / notification / critical-priority` \u2014 urgent page on critical ticket creation\n- `sla_breach / analytics / priority` \u2014 satisfies the analytics SLA obligation (priority-keyed breach tracking)\n- `sla_breach / analytics / always` \u2014 general SLA breach analytics\n- `sla_breach / notification / not-terminal` \u2014 notify on breach for open tickets\n- `transition / sla_tracking / always` \u2014 SLA clock tracking on every transition\n- `priority_change / analytics / always` \u2014 track priority changes for reporting\n\nAll obligation checks pass across notifications, permissions, analytics, and workflow. Python modules written to `output/e32-graph_validated-run-3/projected/`.",
+  "stop_reason": "end_turn",
+  "session_id": "347b3ba4-a428-449d-b53c-b5f02fc4efc4",
+  "total_cost_usd": 0.42241755000000003,
+  "usage": {
+    "input_tokens": 32,
+    "cache_creation_input_tokens": 15721,
+    "cache_read_input_tokens": 840396,
+    "output_tokens": 7374,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 15721,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 336,
+        "cache_read_input_tokens": 31664,
+        "cache_creation_input_tokens": 134,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 134
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 559,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000639,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 32,
+      "outputTokens": 7374,
+      "cacheReadInputTokens": 840396,
+      "cacheCreationInputTokens": 15721,
+      "webSearchRequests": 0,
+      "costUSD": 0.42177855000000003,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "9f3356fc-08fe-4aee-8812-835aa981399f"
+}

@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 96859,
+  "duration_api_ms": 98258,
+  "num_turns": 24,
+  "result": "Done. Here's a summary of everything added to the graph:\n\n**Status**\n- `escalated` \u2014 group: escalated, counts_as_work: true, terminal: false, priority: high\n\n**Transitions**\n- `in_progress \u2192 escalated` (escalate)\n- `escalated \u2192 in_progress` (de-escalate)\n- `escalated \u2192 closed` (close directly)\n\n**Permissions**\n- `escalate`: agent, admin\n- `de_escalate`: agent, admin\n\n**Effects**\n- `transition / notification / escalated` \u2014 differentiated urgent notification on escalation transitions\n- `transition / analytics / is_escalated` \u2014 separate analytics tag for escalated-status transitions\n\n**Obligations status**\n- workflow, permissions, notifications: clean\n- analytics: one open obligation \u2014 the `is_escalated` field should appear in `track_transition`'s event dict. The effect is declared in the graph and `ESCALATED_STATUSES` is already imported in the projected module; the projector needs to wire the field through. This is a projector gap, not a graph gap.",
+  "stop_reason": "end_turn",
+  "session_id": "d5fa58f5-5849-41a0-afd1-44904116ca6d",
+  "total_cost_usd": 0.20262554999999996,
+  "usage": {
+    "input_tokens": 13,
+    "cache_creation_input_tokens": 12141,
+    "cache_read_input_tokens": 280546,
+    "output_tokens": 4811,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 12141,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 255,
+        "cache_read_input_tokens": 27191,
+        "cache_creation_input_tokens": 616,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 616
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 13,
+      "outputTokens": 4811,
+      "cacheReadInputTokens": 280546,
+      "cacheCreationInputTokens": 12141,
+      "webSearchRequests": 0,
+      "costUSD": 0.20189654999999998,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "8700233d-da3c-4931-b965-21fe3a2c2db6"
+}

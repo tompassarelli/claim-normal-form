@@ -12,6 +12,7 @@
 
 (define output-dir (box #f))
 (define server-mode (box "label"))
+(define base-domain (box "standard"))
 
 (command-line
  #:once-each
@@ -21,6 +22,10 @@
   (unless (member mode '("label" "validated" "properties"))
     (error 'claimdesk-mcp "invalid mode: ~a" mode))
   (set-box! server-mode mode)]
+ [("--base") base "Base domain: standard or e32"
+  (unless (member base '("standard" "e32"))
+    (error 'claimdesk-mcp "invalid base: ~a" base))
+  (set-box! base-domain base)]
  #:args () (void))
 
 ;; ── Transport ────────────────────────────────────────────────
@@ -46,14 +51,14 @@
   (case (unbox server-mode)
     [("label")
      (hasheq 'name "add_status"
-             'description "Add a new status to the domain. Group must be 'active', 'terminal', or 'blocked'."
+             'description "Add a new status to the domain. Group must be 'active', 'terminal', 'blocked', or 'escalated'."
              'inputSchema (hasheq 'type "object"
                                   'properties (hasheq
                                                'name (hasheq 'type "string"
                                                              'description "Status name (e.g. 'suspended', 'escalated')")
                                                'group (hasheq 'type "string"
-                                                              'enum '("active" "terminal" "blocked")
-                                                              'description "Status group: 'active', 'terminal', or 'blocked'"))
+                                                              'enum '("active" "terminal" "blocked" "escalated")
+                                                              'description "Status group: 'active', 'terminal', 'blocked', or 'escalated'"))
                                   'required '("name" "group")))]
     [("validated")
      (hasheq 'name "add_status"
@@ -63,12 +68,15 @@
                                                'name (hasheq 'type "string"
                                                              'description "Status name")
                                                'group (hasheq 'type "string"
-                                                              'enum '("active" "terminal" "blocked")
+                                                              'enum '("active" "terminal" "blocked" "escalated")
                                                               'description "Proposed group")
                                                'counts_as_work (hasheq 'type "boolean"
                                                                        'description "Does this status count as active workload? (true for statuses where work is happening)")
                                                'terminal (hasheq 'type "boolean"
-                                                                  'description "Is this a final/closed state that tickets don't come back from?"))
+                                                                  'description "Is this a final/closed state that tickets don't come back from?")
+                                               'priority (hasheq 'type "string"
+                                                                  'enum '("normal" "high")
+                                                                  'description "Priority level. Use 'high' for statuses requiring urgent/escalated handling. Optional — omit for standard statuses."))
                                   'required '("name" "group" "counts_as_work" "terminal")))]
     [("properties")
      (hasheq 'name "add_status"
@@ -80,7 +88,10 @@
                                                'counts_as_work (hasheq 'type "boolean"
                                                                        'description "Does this status count as active workload? (true for statuses where work is happening)")
                                                'terminal (hasheq 'type "boolean"
-                                                                  'description "Is this a final/closed state that tickets don't come back from?"))
+                                                                  'description "Is this a final/closed state that tickets don't come back from?")
+                                               'priority (hasheq 'type "string"
+                                                                  'enum '("normal" "high")
+                                                                  'description "Priority level. Use 'high' for statuses requiring urgent/escalated handling. Optional — omit for standard statuses."))
                                   'required '("name" "counts_as_work" "terminal")))]))
 
 (define tool-defs
@@ -169,7 +180,30 @@
                                                                   'description "For can_transition: current status name")
                                              'to_status (hasheq 'type "string"
                                                                 'description "For can_transition: target status name"))
-                                'required '("query")))))
+                                'required '("query")))
+
+   (hasheq 'name "add_priority"
+           'description "Add a priority level. Each priority has a response target (hours), a required role for assignment (use 'any' for unrestricted), a notification mode ('normal', 'immediate_email', or 'urgent_page'), and an auto-escalation flag. If auto_escalate is true, specify escalates_to as the target status group name."
+           'inputSchema (hasheq 'type "object"
+                                'properties (hasheq
+                                             'name (hasheq 'type "string"
+                                                           'description "Priority name (e.g. 'low', 'normal', 'high', 'critical')")
+                                             'response_target (hasheq 'type "number"
+                                                                      'description "Response time target in hours")
+                                             'required_role (hasheq 'type "string"
+                                                                    'description "Minimum role required to set this priority: 'any', 'agent', 'senior', 'admin'")
+                                             'notification_mode (hasheq 'type "string"
+                                                                        'enum '("normal" "immediate_email" "urgent_page")
+                                                                        'description "Notification mode for this priority level")
+                                             'auto_escalate (hasheq 'type "boolean"
+                                                                    'description "Whether tickets at this priority auto-escalate")
+                                             'escalates_to (hasheq 'type "string"
+                                                                   'description "Target status group for auto-escalation (required if auto_escalate is true)"))
+                                'required '("name" "response_target" "required_role" "notification_mode" "auto_escalate")))
+
+   (hasheq 'name "list_priorities"
+           'description "List all priority levels with their properties (response target, required role, notification mode, auto-escalation)."
+           'inputSchema (hasheq 'type "object" 'properties (hasheq)))))
 
 ;; ── Tool handlers ────────────────────────────────────────────
 
@@ -180,14 +214,14 @@
 (define (handle-tool name arguments)
   (case name
     [("list_statuses")
-     (define terms (terminal-statuses))
-     (define acts (active-statuses))
-     (define blk (blocked-statuses))
-     (define result (hasheq 'terminal terms
-                            'active acts
-                            'total (+ (length terms) (length acts) (length blk))))
-     (jsexpr->string
-      (if (null? blk) result (hash-set result 'blocked blk)))]
+     (define used (get-used-groups))
+     (define result (make-hasheq))
+     (define total 0)
+     (for ([g (in-list used)])
+       (define sts (statuses-for-group g))
+       (set! total (+ total (length sts)))
+       (set! result (hash-set result (string->symbol g) sts)))
+     (jsexpr->string (hash-set result 'total total))]
 
     [("list_transitions")
      (define transitions (current-claims-where #:p transition-from))
@@ -235,31 +269,37 @@
 
     [("add_status")
      (define name-arg (hash-ref arguments 'name))
+     (define (build-props)
+       (define props (hash "counts_as_work" (hash-ref arguments 'counts_as_work)
+                           "terminal" (hash-ref arguments 'terminal)))
+       (define priority (hash-ref arguments 'priority #f))
+       (if priority (hash-set props "priority" priority) props))
+     (define (format-groups)
+       (define used (get-used-groups))
+       (string-join
+        (for/list ([g (in-list used)])
+          (format "~a: ~a" g (statuses-for-group g)))
+        ". "))
      (case (unbox server-mode)
        [("label")
         (define group-arg (hash-ref arguments 'group))
         (void (define-status! name-arg group-arg))
-        (format "Status '~a' added (group: ~a). Terminal: ~a. Active: ~a. Blocked: ~a."
-                name-arg group-arg (terminal-statuses) (active-statuses) (blocked-statuses))]
+        (format "Status '~a' added (group: ~a). Groups: ~a."
+                name-arg group-arg (format-groups))]
        [("validated")
         (define group-arg (hash-ref arguments 'group))
-        (define props (hash "counts_as_work" (hash-ref arguments 'counts_as_work)
-                            "terminal" (hash-ref arguments 'terminal)))
+        (define props (build-props))
         (void (define-status-validated! name-arg group-arg props))
-        (format "Status '~a' added (group: ~a, validated against properties). Terminal: ~a. Active: ~a. Blocked: ~a."
-                name-arg group-arg (terminal-statuses) (active-statuses) (blocked-statuses))]
+        (format "Status '~a' added (group: ~a, validated). Groups: ~a."
+                name-arg group-arg (format-groups))]
        [("properties")
-        (define props (hash "counts_as_work" (hash-ref arguments 'counts_as_work)
-                            "terminal" (hash-ref arguments 'terminal)))
+        (define props (build-props))
         (define group (derive-group props))
         (unless group
-          (error 'add_status "no group matches properties counts_as_work=~a, terminal=~a"
-                 (hash-ref arguments 'counts_as_work) (hash-ref arguments 'terminal)))
+          (error 'add_status "no group matches properties ~a" props))
         (void (define-status-from-properties! name-arg props))
-        (format "Status '~a' added. Derived group: ~a (from counts_as_work=~a, terminal=~a). Terminal: ~a. Active: ~a. Blocked: ~a."
-                name-arg group
-                (hash-ref arguments 'counts_as_work) (hash-ref arguments 'terminal)
-                (terminal-statuses) (active-statuses) (blocked-statuses))])]
+        (format "Status '~a' added. Derived group: ~a (from ~a). Groups: ~a."
+                name-arg group props (format-groups))])]
 
     [("add_transition")
      (define from-arg (hash-ref arguments 'from))
@@ -308,6 +348,46 @@
      (define dir (or (unbox output-dir) (error 'project_all_to_disk "no --output-dir set")))
      (project-all! dir)
      (format "Projected 4 modules to ~a: workflow.py, permissions.py, notifications.py, analytics.py" dir)]
+
+    [("add_priority")
+     (define name-arg (hash-ref arguments 'name))
+     (define rt (hash-ref arguments 'response_target))
+     (define req-role (hash-ref arguments 'required_role))
+     (define notif-mode (hash-ref arguments 'notification_mode))
+     (define auto-esc (hash-ref arguments 'auto_escalate))
+     (define esc-to (hash-ref arguments 'escalates_to #f))
+     ;; Validated mode: reject bad cross-entity references
+     (when (equal? (unbox server-mode) "validated")
+       (when (and auto-esc (not esc-to))
+         (error 'add_priority "auto_escalate is true but no escalates_to target specified"))
+       (when (and auto-esc esc-to)
+         (when (null? (statuses-for-group esc-to))
+           (error 'add_priority
+                  "auto_escalate targets group '~a' but that group has no statuses" esc-to)))
+       (when (and req-role (not (equal? req-role "any")))
+         (unless (hash-has-key? role-entities req-role)
+           (error 'add_priority
+                  "required_role '~a' does not exist as a role in the domain" req-role))))
+     (void (define-priority! name-arg rt req-role notif-mode auto-esc esc-to))
+     (define config (priority-config name-arg))
+     (format "Priority '~a' added: response_target=~ah, required_role=~a, notification_mode=~a, auto_escalate=~a~a. Priorities: ~a."
+             name-arg rt req-role notif-mode auto-esc
+             (if (and auto-esc esc-to) (format ", escalates_to=~a" esc-to) "")
+             (string-join (all-priorities) ", "))]
+
+    [("list_priorities")
+     (define prios (all-priorities))
+     (if (null? prios)
+         "No priorities defined."
+         (jsexpr->string
+          (for/list ([pname (in-list prios)])
+            (define pc (priority-config pname))
+            (hasheq 'name pname
+                    'response_target (hash-ref pc "response_target")
+                    'required_role (hash-ref pc "required_role")
+                    'notification_mode (hash-ref pc "notification_mode")
+                    'auto_escalate (hash-ref pc "auto_escalate")
+                    'escalates_to (hash-ref pc "escalates_to" #f)))))]
 
     [("query_domain")
      (define query-arg (hash-ref arguments 'query))
@@ -377,8 +457,11 @@
 
 ;; ── Main ─────────────────────────────────────────────────────
 
-(setup-claimdesk!)
-(eprintf "claimdesk-mcp: ready (mode: ~a)\n" (unbox server-mode))
+(case (unbox base-domain)
+  [("standard") (setup-claimdesk!)]
+  [("e32") (setup-claimdesk-e32!)])
+(eprintf "claimdesk-mcp: ready (mode: ~a, base: ~a)\n"
+         (unbox server-mode) (unbox base-domain))
 
 (let loop ()
   (define msg (read-message))

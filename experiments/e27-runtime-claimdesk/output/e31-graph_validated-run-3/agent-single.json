@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 165003,
+  "duration_api_ms": 166605,
+  "num_turns": 29,
+  "result": "Done. Here's a summary of every change made to the graph:\n\n**Status added**\n- `escalated` \u2014 group `escalated`, `counts_as_work=true`, `terminal=false`, `priority=high`\n\n**Transitions added**\n- `in_progress \u2192 escalated` (escalate)\n- `escalated \u2192 in_progress` (de-escalate)\n- `escalated \u2192 closed` (close directly)\n\n**Permissions added**\n- `escalate` \u2192 agent, admin\n- `de_escalate` \u2192 agent, admin\n\n**Effects added**\n- `transition / notification-urgent / escalated` \u2014 differentiated urgent notification for escalated transitions\n- `transition / notification / escalated` \u2014 satisfies the notifications module obligation\n- `transition / analytics-escalated / escalated` \u2014 escalated-specific analytics kind\n- `transition / analytics / escalated` \u2014 satisfies the analytics module obligation (enables `is_escalated` tagging and `ESCALATED_STATUSES` workload counting)\n\nAll four modules (`workflow`, `permissions`, `notifications`, `analytics`) passed obligation checks and the projected Python is saved to `output/e31-graph_validated-run-3/projected/`.",
+  "stop_reason": "end_turn",
+  "session_id": "d78ea2b8-ef64-4a1b-a7e3-04f3ab6e3aa8",
+  "total_cost_usd": 0.31447679999999995,
+  "usage": {
+    "input_tokens": 17,
+    "cache_creation_input_tokens": 16576,
+    "cache_read_input_tokens": 399806,
+    "output_tokens": 8773,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 16576,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 276,
+        "cache_read_input_tokens": 32105,
+        "cache_creation_input_tokens": 137,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 137
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 17,
+      "outputTokens": 8773,
+      "cacheReadInputTokens": 399806,
+      "cacheCreationInputTokens": 16576,
+      "webSearchRequests": 0,
+      "costUSD": 0.31374779999999997,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "83f13389-b350-4e48-a28c-741d00ca7e1f"
+}

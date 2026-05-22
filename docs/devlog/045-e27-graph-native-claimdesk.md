@@ -243,19 +243,131 @@ The graph went from "amplifies agent decisions" to "compiles agent
 intent." The more semantic authority lives in the graph, the fewer ways
 the agent can produce structural bugs.
 
+## E31: Novel group synthesis (2026-05-22)
+
+### The test
+
+E30 proved that property-derived classification eliminates
+misclassification for a clean third group (blocked: no property overlap).
+E31 tests whether it generalizes to groups with overlapping properties.
+
+Task: add "escalated" — a fourth group that shares `counts_as_work=true,
+terminal=false` with active but adds `priority: "high"`. The graph's
+most-specific-match algorithm must select escalated (3 matching
+properties) over active (2 matching properties).
+
+### Results
+
+| Condition | Structural | Obligation | Mean cost |
+|-----------|-----------|------------|-----------|
+| file_single | 9/27 (33%) | 6/24 (25%) | $0.157 |
+| graph_label | 0/27 (0%) | 2/24 (8%) | $0.211 |
+| graph_properties | 0/27 (0%) | 2/24 (8%) | $0.231 |
+| graph_validated | 0/27 (0%) | 1/24 (4%) | $0.308 |
+
+### The finding
+
+Structural correctness is absolute: all graph conditions 0/27, file
+9/27 (deterministic — same 3 bugs every run). The file agent puts
+escalated into ACTIVE_STATUSES because it can't distinguish "shares
+properties with active" from "is active." The graph emits
+ESCALATED_STATUSES as its own set because derive-group selects the
+most-specific match.
+
+The only obligation failure across graph conditions is test_14 (analytics
+`is_escalated` tag) — the agent sometimes doesn't complete the obligation
+repair loop for the analytics effect. This is behavioral variance, not a
+classification problem.
+
+### The progression
+
+```
+E28: both correct, graph faster/cheaper
+E29: graph amplifies classification, right or wrong
+E30: property-derived classification eliminates misclassification
+E31: most-specific-match generalizes to overlapping property groups
+```
+
+The graph went from "amplifies agent decisions" to "compiles agent
+intent" to "derives novel structure from declared properties."
+
+## E32: Cross-entity obligation synthesis (2026-05-22)
+
+### The test
+
+E31 tested single-entity classification (status → group). E32 tests
+multi-entity feature synthesis: priorities are entities with 6 typed
+properties, each creating obligations across 4 modules (workflow →
+permissions → notifications → analytics).
+
+Task: add 4 priority levels (low, normal, high, critical). Each
+priority carries response_target, required_role, notification_mode,
+auto_escalate, and escalates_to. Critical auto-escalates to the
+escalated group, requires senior role, triggers urgent pages. 3
+conditions (graph, graph_validated, file_single), 3 runs each, 17
+tests in 4 categories.
+
+### Results
+
+| Condition | Structural | Cross-entity | Obligation | Projection | Total |
+|-----------|-----------|-------------|------------|------------|-------|
+| graph | 0/12 | 0/12 | 0/15 | 0/12 | 0/51 |
+| graph_validated | 0/12 | 0/12 | 0/15 | 0/12 | 0/51 |
+| file_single | 12/12 | 12/12 | 15/15 | 6/12 | 45/51 |
+
+Both graph conditions: 17/17 every run, zero bugs across all categories.
+file_single: 2/17 every run (deterministic), 88% failure rate.
+
+### The failure cascade
+
+The file agent builds `PRIORITIES = {"low", "normal", "high", "critical"}`
+— a flat set following the TERMINAL_STATUSES pattern. A set of strings
+cannot carry response_target, required_role, notification_mode,
+auto_escalate, or escalates_to. Without those properties, cross-entity
+relations don't exist. Without relations, obligations don't fire.
+Without obligations, the downstream modules lack permission gates,
+notification routing, analytics tracking, and SLA compliance.
+
+One representation choice cascades through all 4 test categories.
+
+### The progression
+
+File failure rate scales with relational density:
+- E31 (1 entity, 1 relation): 29%
+- E32 (4 entities, 4 relations each): 88%
+
+The graph's advantage compounds. Each additional cross-entity relation
+is another obligation the file agent cannot express and the graph
+projector automatically preserves.
+
+```
+E28: both correct, graph faster/cheaper
+E29: graph amplifies classification, right or wrong
+E30: property-derived classification eliminates misclassification
+E31: most-specific-match generalizes to overlapping groups
+E32: cross-entity obligations preserved; file failure scales with relational density
+```
+
 ## Files
 
 - `experiments/e27-runtime-claimdesk/claimdesk.rkt` — domain model,
   evaluators, obligation checker, projection (4 modules)
 - `experiments/e27-runtime-claimdesk/claimdesk-mcp.rkt` — MCP server
-  (14 tools, `--mode` flag for label/validated/properties)
+  (14 tools, `--mode` flag for label/validated/properties, `--base` for
+  standard/e32 domain)
 - `experiments/e27-runtime-claimdesk/runner.py` — E28 experiment runner
 - `experiments/e27-runtime-claimdesk/e29-runner.py` — E29 experiment runner
   (4 conditions, obligation pressure)
 - `experiments/e27-runtime-claimdesk/e30-runner.py` — E30 experiment runner
   (4 conditions, semantic authority transfer)
+- `experiments/e27-runtime-claimdesk/e31-runner.py` — E31 experiment runner
+  (4 conditions, novel group synthesis)
+- `experiments/e27-runtime-claimdesk/e32-runner.py` — E32 experiment runner
+  (3 conditions, cross-entity obligation synthesis)
 - `experiments/e27-runtime-claimdesk/demo.rkt` — full pipeline demo
 - `experiments/e27-runtime-claimdesk/test-claimdesk.rkt` — 13 unit tests
 - `docs/experiments/e27-runtime-claimdesk/results.md` — E28 results
 - `docs/experiments/e27-runtime-claimdesk/results-e29.md` — E29 results
 - `docs/experiments/e27-runtime-claimdesk/results-e30.md` — E30 results
+- `docs/experiments/e27-runtime-claimdesk/results-e31.md` — E31 results
+- `docs/experiments/e27-runtime-claimdesk/results-e32.md` — E32 results

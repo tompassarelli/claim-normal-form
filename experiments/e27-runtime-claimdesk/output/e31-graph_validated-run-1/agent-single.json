@@ -1,0 +1,69 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 153000,
+  "duration_api_ms": 154275,
+  "num_turns": 41,
+  "result": "Done. Here's a summary of every graph change made:\n\n**Status**\n- Added `escalated` (group: escalated, counts_as_work: true, terminal: false, priority: high)\n\n**Transitions**\n- `in_progress \u2192 escalated`\n- `escalated \u2192 in_progress` (de-escalate path)\n- `escalated \u2192 closed` (close directly)\n\n**Permissions**\n- `escalate` \u2192 agent, admin\n- `de_escalate` \u2192 agent, admin\n\n**Effects**\n- `transition / urgent-notification / escalated` \u2014 differentiated urgent notification on escalated transitions\n- `transition / notification / escalated` \u2014 standard notification handler for escalated group (satisfies notifications obligation)\n- `transition / analytics / escalated` \u2014 group-level analytics tracking (satisfies analytics obligation)\n- `transition / analytics / is_escalated` \u2014 per-event `is_escalated` flag tagging\n\nThe projected `workflow.py` now exports `ESCALATED_STATUSES = {\"escalated\"}` and `is_escalated()`, `permissions.py` has the `escalate`/`de_escalate` actions, and `analytics.py` includes `ESCALATED_STATUSES` in the workload count so escalated tickets are included in active work metrics.",
+  "stop_reason": "end_turn",
+  "session_id": "24b7391c-b92a-41ef-a833-a3aeb8e0f58b",
+  "total_cost_usd": 0.40632689999999994,
+  "usage": {
+    "input_tokens": 24,
+    "cache_creation_input_tokens": 31878,
+    "cache_read_input_tokens": 584728,
+    "output_tokens": 7371,
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 31878,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "",
+    "iterations": [
+      {
+        "input_tokens": 1,
+        "output_tokens": 299,
+        "cache_read_input_tokens": 31743,
+        "cache_creation_input_tokens": 135,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 135
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 644,
+      "outputTokens": 17,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.000729,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    },
+    "claude-sonnet-4-6": {
+      "inputTokens": 24,
+      "outputTokens": 7371,
+      "cacheReadInputTokens": 584728,
+      "cacheCreationInputTokens": 31878,
+      "webSearchRequests": 0,
+      "costUSD": 0.40559789999999996,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "uuid": "7b6edefe-402d-4fa0-b955-f3f396c464e3"
+}
